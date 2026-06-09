@@ -10,6 +10,7 @@ import requests
 import pyautogui
 import ollama
 import httpx
+import rules
 from pydantic import BaseModel
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -49,6 +50,7 @@ class CommandRequest(BaseModel):
 async def send_to_dashboard(msg):
     logger.info(f"==> {msg}")
     try:
+        # 이 포스트 요청 시 대시보드 서버 콘솔에도 msg 내용이 출력되고 있을 것입니다.
         await httpx_client.post(WEB_LOG_URL, json={"message": msg}, timeout=0.5)
     except Exception:
         pass
@@ -146,6 +148,8 @@ async def process_macro_routing(request: CommandRequest):
     user_command = request.command
     await send_to_dashboard(f"📩 [Macro Engine] 자연어 해석 인입: '{user_command}'")
 
+    rule_hint = rules.pre_analyze_intent(user_command)
+
     all_scenarios = load_all_scenarios()
     scenarios_desc = ""
     for s_id, s_data in all_scenarios.items():
@@ -153,11 +157,16 @@ async def process_macro_routing(request: CommandRequest):
 
     system_prompt = (
         "You are an advanced Windows automation router and parameter extractor.\n"
-        "Analyze the user's command to match the correct scenario ID, detect delay time, and extract calculation parameters if applicable.\n\n"
+        "Analyze the user's command to match the correct scenario ID, detect delay time, and extract parameters.\n\n"
         f"Available Scenario IDs:\n{scenarios_desc}- 'unknown': when no scenario matches.\n\n"
-        "If the user wants to calculate (e.g., 'windows_calc'), you MUST extract 'num1', 'op', and 'num2'.\n"
-        "Normalize 'op' to one of these single characters: '+', '-', '*', '/'. (e.g., '곱하기' or 'x' becomes '*')\n"
-        "Convert Korean number words to strings of digits (e.g., '백' becomes '100', '삼' becomes '3').\n\n"
+        "RULE ENGINE HINTS (CRITICAL):\n"
+        f"- Is there a mathematical formula detected?: {rule_hint['has_math']}\n"
+        f"- Recommended Target Application based on rules: {rule_hint['suggested_target']}\n"
+        "-> Rely heavily on the Recommended Target Application when picking the scenario_id.\n\n"
+        "PARAMETER EXTRACTION RULES:\n"
+        "- If a math operation or calculation is requested, extract 'num1', 'op', and 'num2'.\n"
+        "- Normalize 'op' to: '+', '-', '*', '/'.\n"
+        "- Convert Korean number words to strings of digits.\n\n"
         "Strictly output ONLY a raw JSON object matching this structure:\n"
         "{\n"
         "  \"scenario_id\": \"string\",\n"
@@ -200,7 +209,7 @@ async def process_macro_routing(request: CommandRequest):
             await send_to_dashboard(f"🤖 AI 분석 ➡️ ID: {scenario_id} / 파라미터: {params}")
             return {"status": "success", "message": msg}
         else:
-            await send_to_dashboard("⚠️ AI 매핑 실패 ➡️ 알수없는 커맨드, 등록되지 않은 매크로 ID")
+            await send_to_dashboard(f"⚠️ AI 매핑 실패 ➡️ 알수없는 커맨드, 등록되지 않은 매크로 ID (추출 결과: {scenario_id})")
             return {"status": "fail", "message": "일치하는 매크로 시나리오가 없습니다."}
             
     except Exception as e:
