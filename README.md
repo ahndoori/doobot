@@ -2,7 +2,7 @@
 
 사용자의 음성을 인식하고 화면을 분석하여 매크로를 수행하는 반자동 AI 에이전트
 
-<img src="./2048player-demo.gif" width="100%"/>
+<img src="./demo.gif" width="100%"/>
 
 ---
 
