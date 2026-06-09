@@ -11,9 +11,12 @@ import pyautogui
 import ollama
 import httpx
 import rules
+import cv2  # 💡 정밀 매칭을 위해 OpenCV 도입
+import numpy as np
 from pydantic import BaseModel
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from PIL import ImageGrab
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("MacroCore")
@@ -50,27 +53,56 @@ class CommandRequest(BaseModel):
 async def send_to_dashboard(msg):
     logger.info(f"==> {msg}")
     try:
-        # 이 포스트 요청 시 대시보드 서버 콘솔에도 msg 내용이 출력되고 있을 것입니다.
         await httpx_client.post(WEB_LOG_URL, json={"message": msg}, timeout=0.5)
     except Exception:
         pass
 
-def find_and_click_sync(image_name, confidence_level=0.8, wait_time=1.0):
+def find_and_click_sync(image_name, confidence_level=0.6, wait_time=1.0):
+    """
+    pyautogui 대신 OpenCV 엔진을 사용하여 윈도우 배율/배경색 문제를 무시하고 매칭합니다.
+    """
     try:
         image_path = os.path.join(VISION_DIR, image_name)
         if not os.path.exists(image_path):
             logger.error(f"❌ 비전 파일 유실: [{image_path}]")
             return False
-        location = pyautogui.locateOnScreen(image_path, confidence=confidence_level)
-        if location:
-            center_x, center_y = pyautogui.center(location)
+            
+        logger.info(f"🔍 [OpenCV] 매칭 가동 ➡️ {image_name} (임계값: {confidence_level})")
+        
+        # 1. 현재 전체 화면을 PIL로 안전하게 캡처 후 OpenCV 이미지로 변환
+        screen = ImageGrab.grab()
+        screen_np = np.array(screen)
+        screen_gray = cv2.cvtColor(screen_np, cv2.COLOR_RGB2GRAY)
+        
+        # 2. 찾고자 하는 타겟 이미지 로드 (흑백 변환)
+        template = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+        if template is None:
+            logger.error(f"❌ 템플릿 이미지를 읽을 수 없습니다: {image_name}")
+            return False
+            
+        w, h = template.shape[::-1]
+        
+        # 3. 템플릿 매칭 수행
+        res = cv2.matchTemplate(screen_gray, template, cv2.TM_CCOEFF_NORMED)
+        min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
+        
+        logger.info(f"📊 매칭 유사도 분석 결과 ➡️ 최고 점수: {max_val:.4f} (목표값: {confidence_level})")
+        
+        # 4. 판정 및 클릭
+        if max_val >= confidence_level:
+            # 매칭된 중심점 계산
+            center_x = int(max_loc[0] + w / 2)
+            center_y = int(max_loc[1] + h / 2)
+            
+            # 마우스 이동 및 클릭
             pyautogui.moveTo(center_x, center_y, duration=0.2)
             pyautogui.click()
             time.sleep(wait_time)
             return True
+            
         return False
     except Exception as e:
-        logger.error(f"⚠️ 비전 크래시: {str(e)}")
+        logger.error(f"⚠️ OpenCV 비전 엔진 내 크래시: {str(e)}")
         return False
 
 def load_all_scenarios():
@@ -103,12 +135,24 @@ async def run_macro_sequence(macro, delay_seconds, params=None):
 
         if action == "vision_click":
             target_img = step.get("target")
-            conf = step.get("confidence", 0.8)
+            conf = step.get("confidence", 0.55)  # 집 환경 최적화를 위해 기본 마진 대폭 완화
             
             loop = asyncio.get_event_loop()
-            success = await loop.run_in_executor(None, find_and_click_sync, target_img, conf, delay)
+            try:
+                success = await loop.run_in_executor(None, find_and_click_sync, target_img, conf, delay)
+            except Exception as thread_err:
+                logger.error(f"⚠️ Executor 스레드 붕괴: {str(thread_err)}")
+                success = False
             
             if not success:
+                # 실패 시 무조건 스냅샷 저장
+                debug_path = os.path.join(BASE_DIR, "debug_screenshot.png")
+                try:
+                    ImageGrab.grab().save(debug_path)
+                    logger.error(f"📸 [저장 완료] 중단 시점 스냅샷 ➡️ {debug_path}")
+                except:
+                    pass
+
                 await send_to_dashboard(f"❌ 비전 타겟 매칭 실패 [{target_img}] 시퀀스 중단")
                 return
             await send_to_dashboard(f"🎯 비전 클릭: [{target_img}]")
@@ -116,12 +160,18 @@ async def run_macro_sequence(macro, delay_seconds, params=None):
         elif action == "vision_click_op":
             op_sign = params.get("op", "+")
             target_img = OP_IMAGE_MAP.get(op_sign, "calc_plus.png")
-            conf = step.get("confidence", 0.8)
+            conf = step.get("confidence", 0.55)
             
             loop = asyncio.get_event_loop()
-            success = await loop.run_in_executor(None, find_and_click_sync, target_img, conf, delay)
+            try:
+                success = await loop.run_in_executor(None, find_and_click_sync, target_img, conf, delay)
+            except Exception:
+                success = False
             
             if not success:
+                debug_path = os.path.join(BASE_DIR, "debug_screenshot.png")
+                try: ImageGrab.grab().save(debug_path)
+                except: pass
                 await send_to_dashboard(f"❌ 연산자 비전 매칭 실패 [{target_img}] 시퀀스 중단")
                 return
             await send_to_dashboard(f"🎯 연산자 비전 클릭: [{target_img}] ({op_sign})")

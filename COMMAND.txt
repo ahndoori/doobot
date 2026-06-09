@@ -12,19 +12,29 @@ python -m pip install virtualenv
 python -m virtualenv .venv
 .venv\Scripts\activate
 
-pip install fastapi uvicorn pydantic pyautogui ollama
-pip install --upgrade opencv-python
-pip install PyQt6 SpeechRecognition edge-tts pygame asyncio
+pip install fastapi uvicorn
 pip install jinja2 requests
-pip install pyaudio
-pip install vosk
+pip install websockets
+pip install pyautogui
+pip install ollama
+pip install pydantic
 pip install sounddevice
+pip install vosk
+pip install edge-tts
+pip install pygame
+pip install asyncio
+pip install opencv-python
+pip install pillow
+
+
+
+pip install PyQt6 SpeechRecognition
+pip install pyaudio
 
 pip freeze > requirements.txt
 
 taskkill /f /im python.exe
 uvicorn app:app --port 4444 --reload
-uvicorn app:app --port 4444 --reload --reload-exclude "*.mp3"
 
 
 curl -X POST "http://127.0.0.1:4444/api/command" -H "Content-Type: application/json" -d "{\"command\": \"300x300에 마우스클릭\"}"
