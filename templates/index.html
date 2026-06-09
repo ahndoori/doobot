@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Macro Dashboard</title>
+    <link rel="stylesheet" href="/public/index.css?v=20260609_led_final">
+</head>
+<body>
+    <div class="app-container">
+        <main class="content-area">
+            <div id="log-box" class="log-viewport"></div>
+        </main>
+
+        <footer class="control-panel">
+            <div class="control-wrapper">
+                
+                <div class="status-bar">
+                    <div class="status-badge">
+                        <span class="indicator blinking led-green"></span> Monitor Active
+                    </div>
+					<div class="status-badge" id="btn-macro">
+                        <span class="indicator blinking led-green"></span> 
+						LLM / Macro
+                    </div>
+					<div class="status-badge" id="btn-voice">
+                        <span class="indicator blinking led-green"></span> 
+						Voice Listener
+                    </div>
+                </div>
+
+                <div class="input-container">
+                    <textarea id="cmd-input" rows="1" placeholder="명령을 입력하세요 (Enter: 전송 / Shift+Enter: 줄바꿈)"></textarea>
+                    <button id="btn-send" class="send-btn">
+                        <svg viewBox="0 0 24 24" width="22" height="22">
+                            <path fill="currentColor" d="M2,21L23,12L2,3V10L17,12L2,14V21Z" />
+                        </svg>
+                    </button>
+                </div>
+
+            </div>
+        </footer>
+    </div>
+    <script src="/public/index.js?v=20260609_led_final"></script>
+</body>
+</html>

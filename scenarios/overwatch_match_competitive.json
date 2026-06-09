@@ -1,0 +1,10 @@
+{
+  "competitive_start": {
+    "trigger_keywords": ["경쟁전", "돌려", "매칭"],
+    "description": "메뉴 화면에서 경쟁전 매칭을 시작",
+    "steps": [
+      { "action": "vision_click", "target": "play_menu.png", "confidence": 0.8, "delay": 1.0 },
+      { "action": "vision_click", "target": "ranked_match.png", "confidence": 0.8, "delay": 0.5 }
+    ]
+  }
+}

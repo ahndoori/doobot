@@ -1,0 +1,32 @@
+
+
+https://ollama.com/download/OllamaSetup.exe
+cd C:\Users\kaudo\AppData\Local\Programs\Ollama
+ollama pull qwen2.5:1.5b
+
+
+python -m pip install --upgrade pip
+
+
+python -m pip install virtualenv
+python -m virtualenv .venv
+.venv\Scripts\activate
+
+pip install fastapi uvicorn pydantic pyautogui ollama
+pip install --upgrade opencv-python
+pip install PyQt6 SpeechRecognition edge-tts pygame asyncio
+pip install jinja2 requests
+pip install pyaudio
+pip install vosk
+pip install sounddevice
+
+pip freeze > requirements.txt
+
+taskkill /f /im python.exe
+uvicorn app:app --port 4444 --reload
+uvicorn app:app --port 4444 --reload --reload-exclude "*.mp3"
+
+
+curl -X POST "http://127.0.0.1:4444/api/command" -H "Content-Type: application/json" -d "{\"command\": \"300x300에 마우스클릭\"}"
+
+curl -X POST "http://127.0.0.1:4444/api/command" -H "Content-Type: application/json" -d "{\"command\": \"오버워치 실행해줘\"}"

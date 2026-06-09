@@ -1,0 +1,10 @@
+{
+  "winston_pick": {
+    "trigger_keywords": ["윈스턴", "골라", "픽"],
+    "description": "인게임 화면에서 윈스턴 영웅을 찾아서 선택",
+    "steps": [
+      { "action": "vision_click", "target": "winston_portrait.png", "confidence": 0.8, "delay": 0.5 },
+      { "action": "vision_click", "target": "select_confirm_btn.png", "confidence": 0.8, "delay": 0.2 }
+    ]
+  }
+}

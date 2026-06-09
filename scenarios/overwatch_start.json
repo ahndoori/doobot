@@ -1,0 +1,11 @@
+{
+  "overwatch_launch": {
+    "trigger_keywords": ["오버워치", "실행"],
+    "description": "배틀넷을 통해 오버워치를 실행하는 시퀀스",
+    "steps": [
+      { "action": "vision_click", "target": "overwatch_start_btn.png", "confidence": 0.8, "delay": 1.5 },
+      { "action": "type", "text": "battle.net", "delay": 1.5 },
+      { "action": "vision_click", "target": "overwatch_battlenet_item.png", "confidence": 0.7, "delay": 1.0 }
+    ]
+  }
+}
