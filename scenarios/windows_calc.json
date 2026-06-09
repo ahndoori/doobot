@@ -1,0 +1,14 @@
+{
+  "windows_calc": {
+    "description": "윈도우 계산기로 계산",
+    "steps": [
+      { "action": "vision_click", "target": "windows_start_btn.png", "confidence": 0.8, "delay": 1.5 },
+      { "action": "type", "text": "calc", "delay": 1.5 },
+      { "action": "vision_click", "target": "windows_app_calc.png", "confidence": 0.8, "delay": 2.0 },
+      { "action": "type", "text": "{num1}", "delay": 1 },
+      { "action": "vision_click_op", "target": "{op}", "confidence": 0.8, "delay": 1 },
+      { "action": "type", "text": "{num2}", "delay": 1 },
+      { "action": "vision_click", "target": "calc_equal.png", "confidence": 0.8, "delay": 1 }
+    ]
+  }
+}

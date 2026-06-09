@@ -49,10 +49,10 @@ class LogPayload(BaseModel):
 async def add_web_log_and_broadcast(message):
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
     formatted_log = f"[{timestamp}] {message}"
+    print(formatted_log)
     web_logs.append(formatted_log)
     if len(web_logs) > 100:
         web_logs.pop(0)
-    
     for connection in active_connections:
         try:
             await connection.send_json({"type": "new_log", "log": formatted_log})

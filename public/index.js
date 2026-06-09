@@ -78,7 +78,7 @@ async function toggleInfrastructure(target) {
 }
 
 function appendLocalLog(msg) {
-    const timestamp = new Date().toLocaleTimeString();
+    const timestamp = new Date().toLocaleString('en-CA', { hour12: false }).replace(',', '');
     const logLine = document.createElement("div");
     logLine.textContent = `[${timestamp}] ${msg}`;
     logBox.appendChild(logLine);
