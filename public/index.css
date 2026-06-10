@@ -9,7 +9,7 @@ body, html {
     height: 100%;
     background-color: #eed;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    color: #e3e3e3;
+    color: #333;
     overflow: hidden;
 }
 
@@ -24,7 +24,7 @@ body, html {
 .content-area {
     flex: 1;
     width: 100%;
-    padding: 24px 24px 145px 24px;
+    padding: 20px 24px 140px 24px;
     overflow: hidden;
 }
 
@@ -32,7 +32,7 @@ body, html {
     width: 100%;
     height: 100%;
     font-family: 'Consolas', monospace;
-    font-size: 14px;
+    font-size: 12px;
     line-height: 1.2;
     overflow-y: auto;
 }
@@ -73,22 +73,22 @@ body, html {
     gap: 8px;
     font-size: 13px;
     font-weight: 500;
-    background-color: #26262b;
+    background-color: #333;
     padding: 8px 16px;
-    border-radius: 30px;
+    border-radius: 17px;
     color: #e3e3e3;
-    border: 1px solid #33333c;
+    border: 1px solid #000;
     transition: all 0.2s ease;
 	margin-right:10px;
 }
 
-.toggle-btn {
+.status-badge {
     cursor: pointer;
 }
 
-.toggle-btn:hover {
-    background-color: #2f2f36;
-    border-color: #444450;
+.status-badge:hover {
+    background-color: #333;
+    border-color: #d71;
 }
 
 .toggle-group {
@@ -105,13 +105,13 @@ body, html {
 }
 
 .led-green {
-    background-color: #22c55e;
-    box-shadow: 0 0 10px #22c55e, 0 0 4px #22c55e;
+    background-color: #09a;
+    box-shadow: 0 0 10px #09a, 0 0 4px #09a;
 }
 
 .led-red {
-    background-color: #ef4444;
-    box-shadow: 0 0 10px #ef4444, 0 0 4px #ef4444;
+    background-color: #d71;
+    box-shadow: 0 0 10px #d71, 0 0 4px #d71;
 }
 
 .blinking {
@@ -133,15 +133,15 @@ body, html {
     display: flex;
     align-items: center;
     width: 100%;
-    background-color: #26262b;
-    border: 1px solid #3c3c45;
-    border-radius: 24px;
+    background-color: #333;
+    border: 1px solid #000;
+    border-radius: 25px;
     padding: 10px 16px 10px 22px;
 }
 
 .input-container:focus-within {
     border-color: #d71;
-    background-color: #2a2a32;
+    background-color: #333;
 }
 
 .input-container textarea {
@@ -161,7 +161,7 @@ body, html {
 .send-btn {
     background: transparent;
     border: none;
-    color: #d71;
+    color: #09a;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -172,6 +172,5 @@ body, html {
 }
 
 .send-btn:hover {
-    color: #818cf8;
-    background-color: rgba(79, 70, 229, 0.15);
+    color: #d71;
 }
