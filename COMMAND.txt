@@ -36,7 +36,7 @@ pip freeze > requirements.txt
 taskkill /f /im python.exe
 .venv\Scripts\activate
 uvicorn app:app --port 4444 --reload
-
+.venv\Scripts\python start
 
 curl -X POST "http://127.0.0.1:4444/api/command" -H "Content-Type: application/json" -d "{\"command\": \"300x300에 마우스클릭\"}"
 
