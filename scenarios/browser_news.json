@@ -1,0 +1,39 @@
+{
+  "browser_news": {
+    "description": "브라우저 실행, 뉴스 사이트 접속",
+    "steps": [
+      {
+        "action": "vision_click",
+        "target": "windows_start_btn.png",
+        "confidence": 0.6,
+        "delay": 1.5
+      },
+      {
+        "action": "vision_click",
+        "target": "windows_app_chrome.png",
+        "confidence": 0.6,
+        "delay": 2.0
+      },
+      {
+        "action": "press",
+        "key": "ctrl+l",
+        "delay": 0.5
+      },
+      {
+        "action": "type",
+        "text": "news.naver.com",
+        "delay": 0.5
+      },
+      {
+        "action": "press",
+        "key": "delete",
+        "delay": 0.5
+      },
+      {
+        "action": "press",
+        "key": "enter",
+        "delay": 0.5
+      }
+    ]
+  }
+}

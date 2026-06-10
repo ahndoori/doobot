@@ -1,0 +1,39 @@
+{
+  "browser_weather": {
+    "description": "브라우저 실행, 날씨 사이트 접속",
+    "steps": [
+      {
+        "action": "vision_click",
+        "target": "windows_start_btn.png",
+        "confidence": 0.6,
+        "delay": 0.5
+      },
+      {
+        "action": "vision_click",
+        "target": "windows_app_chrome.png",
+        "confidence": 0.6,
+        "delay": 1
+      },
+      {
+        "action": "press",
+        "key": "ctrl+l",
+        "delay": 2
+      },
+      {
+        "action": "type",
+        "text": "weather.naver.com",
+        "delay": 0.5
+      },
+      {
+        "action": "press",
+        "key": "delete",
+        "delay": 0.5
+      },
+      {
+        "action": "press",
+        "key": "enter",
+        "delay": 0.5
+      }
+    ]
+  }
+}

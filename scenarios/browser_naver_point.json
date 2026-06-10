@@ -1,0 +1,47 @@
+{
+  "browser_naver_point": {
+    "description": "브라우저 실행, 포인트 화면 접속, 1원 수집",
+    "steps": [
+      {
+        "action": "vision_click",
+        "target": "windows_start_btn.png",
+        "confidence": 0.6,
+        "delay": 1
+      },
+      {
+        "action": "vision_click",
+        "target": "windows_app_chrome.png",
+        "confidence": 0.6,
+        "delay": 1
+      },
+      {
+        "action": "press",
+        "key": "ctrl+l",
+        "delay": 1
+      },
+      {
+        "action": "type",
+        "text": "point.pay.naver.com/pc/main",
+        "delay": 0.5
+      },
+      {
+        "action": "press",
+        "key": "delete",
+        "delay": 0.5
+      },
+      {
+        "action": "press",
+        "key": "enter",
+        "delay": 3
+      },
+	  { "action": "scroll", "clicks": -1200, "delay": 1 },
+	  {
+        "action": "click_all",
+        "target": "naver_point_small.png",
+        "confidence": 0.7,
+        "delay": 0.5
+      }
+
+    ]
+  }
+}
