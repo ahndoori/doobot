@@ -1,3 +1,4 @@
+import sys
 import logging
 import json
 import re
@@ -18,7 +19,11 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import ImageGrab
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+handler = logging.StreamHandler(sys.stdout)
+handler.setStream(sys.stdout)
+handler.encoding = "utf-8" 
+handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+logging.basicConfig(level=logging.INFO, handlers=[handler])
 logger = logging.getLogger("Macro-Core")
 
 app = FastAPI(title="Macro Core")
@@ -233,7 +238,6 @@ async def run_macro_sequence(macro, delay_seconds, params=None):
         loop = asyncio.get_event_loop()
 
         if action == "check_branch":
-            await send_to_dashboard(f"🔥")
             target_img = step.get("target")
             conf = step.get("confidence", 0.7)
             exists = await loop.run_in_executor(None, vision_sync, target_img, conf)

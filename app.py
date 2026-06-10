@@ -88,7 +88,8 @@ def spawn_daemon(target):
 
     if target == "macro":
         proc = subprocess.Popen(
-            [VENV_UVICORN, "macro:app", "--port", "4445"],
+            #[VENV_UVICORN, "macro:app", "--port", "4445"],
+			[VENV_PYTHON, "-u", "-m", "uvicorn", "macro:app", "--port", "4445", "--log-level", "info"],
             cwd=BASE_DIR, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8"
         )
         infra_context["macro_process"] = proc
