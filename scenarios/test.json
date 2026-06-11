@@ -2,8 +2,8 @@
   "test": {
     "description": "테스트",
     "steps": [
+		{"action":"check_wait","target":"naver_point_big.png","confidence":0.7,"interval":0.5,"limit":5},
 		{
-
 		"action": "check_branch",
 		"target": "appicon_small_superputty.png",
 		"confidence": 0.7,
@@ -15,15 +15,7 @@
 			{ "action": "click", "target": "appicon_big_superputty.png", "confidence": 0.8, "delay": 4 }
 		]
 		},
-		{ "action": "dblclick", "target": "superputty_session_devwas.png", "confidence": 0.8, "delay": 2 },
-		{ "action": "type", "text": "free", "delay": 0.2 },
-		{ "action": "press", "key": "enter", "delay": 0.5 },
-		{ "action": "type", "text": "df -h", "delay": 0.2 },
-		{ "action": "press", "key": "enter", "delay": 0.5 },
-		{ "action": "type", "text": "cd /svc/debis/was/tomcat/debis9/webapps/ROOT", "delay": 0.2 },
-		{ "action": "press", "key": "enter", "delay": 0.5 },
-		{ "action": "type", "text": "ls -la", "delay": 0.2 },
-		{ "action": "press", "key": "enter", "delay": 0.5 }
+		{ "action": "dblclick", "target": "superputty_session_devwas.png", "confidence": 0.8, "delay": 2 }
     ]
   }
 }
