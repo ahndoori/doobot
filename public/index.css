@@ -57,7 +57,7 @@ body, html {
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
 }
 
 .status-bar {
@@ -70,16 +70,16 @@ body, html {
 	cursor:default;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 5px;
     font-size: 13px;
     font-weight: 500;
     background-color: #333;
-    padding: 8px 16px;
+    padding: 6px 12px;
     border-radius: 17px;
     color: #e3e3e3;
     border: 1px solid #000;
     transition: all 0.2s ease;
-	margin-right:10px;
+	margin-right:5px;
 }
 
 .status-badge {
@@ -173,4 +173,16 @@ body, html {
 
 .send-btn:hover {
     color: #d71;
+}
+
+
+#window-title {
+    width: 100px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#relative-coords, #absolute-coords {
+	width: 60px;
 }

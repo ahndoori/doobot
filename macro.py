@@ -60,7 +60,7 @@ async def send_to_dashboard(msg):
     except Exception:
         pass
 
-def click_sync(image_name, confidence_level=0.7, wait_time=0.5, all_click_with_ctrl=False):
+def click_sync(image_name, confidence_level=0.7, all_click_with_ctrl=False, double_click=False):
     try:
         image_path = os.path.join(VISION_DIR, image_name)
         if not os.path.exists(image_path):
@@ -85,7 +85,8 @@ def click_sync(image_name, confidence_level=0.7, wait_time=0.5, all_click_with_c
                 cy = int(max_loc[1] + h / 2)
                 pyautogui.moveTo(cx, cy, duration=0.2)
                 pyautogui.click()
-                time.sleep(wait_time)
+                if double_click: pyautogui.click()
+                #time.sleep(wait_time)
                 return True
             else:
                 logger.info("📊 매칭된 아이콘이 없습니다")
@@ -109,7 +110,7 @@ def click_sync(image_name, confidence_level=0.7, wait_time=0.5, all_click_with_c
                 pyautogui.keyDown('ctrl')
                 pyautogui.click()
                 pyautogui.keyUp('ctrl')
-                time.sleep(wait_time)
+                #time.sleep(wait_time)
             return True
     except Exception as e:
         logger.error(f"⚠️ OpenCV 비전 엔진 크래시: {str(e)}")
@@ -165,13 +166,11 @@ def load_all_scenarios():
 
 async def run_macro_step(step, params, loop):
     action = step.get("action")
-    delay = step.get("delay", 0.5)
-
-    if action == "click" or action == "vision_click":
+    if action in ["dblclick", "click", "vision_click"]:
         target_img = step.get("target")
         conf = step.get("confidence", 0.6)
         try:
-            success = await loop.run_in_executor(None, click_sync, target_img, conf, delay)
+            success = await loop.run_in_executor(None, click_sync, target_img, conf, False, True if action == "dblclick" else False)
         except Exception as thread_err:
             logger.error(f"⚠️ Executor 스레드 붕괴: {str(thread_err)}")
             success = False
@@ -183,15 +182,16 @@ async def run_macro_step(step, params, loop):
             except:
                 pass
             await send_to_dashboard(f"❌ 비전 타겟 매칭 실패 [{target_img}] 시퀀스 중단")
-            return
+            return False
         await send_to_dashboard(f"🎯 비전 클릭: [{target_img}]")
 
     elif action == "click_all":
         target_img = step.get("target")
         conf = step.get("confidence", 0.7)
-        success = await loop.run_in_executor(None, click_sync, target_img, conf, delay, True)
+        success = await loop.run_in_executor(None, click_sync, target_img, conf, True)
         if not success:
             await send_to_dashboard(f"⚠️ 다중 매칭 실패 혹은 타겟 없음: [{target_img}]")
+            return False
         else:
             await send_to_dashboard(f"✅ 모든 [{target_img}] 타겟 새 탭 열기 완료")
 
@@ -200,7 +200,7 @@ async def run_macro_step(step, params, loop):
         target_img = OP_IMAGE_MAP.get(op_sign, "calc_plus.png")
         conf = step.get("confidence", 0.55)
         try:
-            success = await loop.run_in_executor(None, click_sync, target_img, conf, delay, False)
+            success = await loop.run_in_executor(None, click_sync, target_img, conf, False)
         except Exception:
             success = False
         if not success:
@@ -208,7 +208,7 @@ async def run_macro_step(step, params, loop):
             try: ImageGrab.grab().save(debug_path)
             except: pass
             await send_to_dashboard(f"❌ 연산자 비전 매칭 실패 [{target_img}] 시퀀스 중단")
-            return
+            return False
         await send_to_dashboard(f"🎯 연산자 비전 클릭: [{target_img}] ({op_sign})")
 
     elif action == "type":
@@ -225,16 +225,15 @@ async def run_macro_step(step, params, loop):
         clicks = step.get("clicks", -100)
         pyautogui.scroll(clicks)
         await send_to_dashboard(f"🖱️ 마우스 스크롤 이동: {clicks}")
-    await asyncio.sleep(delay)
+    return True
 
-async def run_macro_sequence(macro, delay_seconds, params=None):
+
+async def run_macro_sequence(macro, params=None):
     if params is None: params = {}
-    if delay_seconds > 0: await asyncio.sleep(delay_seconds)
     await send_to_dashboard(f"🔥 매크로 시퀀스 ➡️ [{macro.get('description', '')}]")
 
     for idx, step in enumerate(macro.get("steps", [])):
         action = step.get("action")
-        delay = step.get("delay", 1.0)
         loop = asyncio.get_event_loop()
 
         if action == "check_branch":
@@ -249,9 +248,13 @@ async def run_macro_sequence(macro, delay_seconds, params=None):
                 await send_to_dashboard(f"🔍 조건 체크 [실패]: [{target_img}] 미발견. steps_false 실행.")
                 branch_steps = step.get("false", [])
             for b_step in branch_steps:
-                await run_macro_step(b_step, params, loop)
-
-        await run_macro_step(step, params, loop)
+                success = await run_macro_step(b_step, params, loop)
+                if not success: return
+                await asyncio.sleep(b_step.get("delay", 1.0))
+            continue
+        success = await run_macro_step(step, params, loop)
+        if not success: break
+        await asyncio.sleep(step.get("delay", 1.0))
     await send_to_dashboard("✅ 시나리오 종료")
 
 
@@ -303,22 +306,17 @@ async def process_macro_routing(request: CommandRequest):
         logger.info(f"🎯 AI 해석 완료 -> {parsed_intent}")
         
         scenario_id = parsed_intent.get("scenario_id", "unknown")
-        delay_seconds = parsed_intent.get("delay_seconds", 0)
 
         if scenario_id != "unknown" and scenario_id in all_scenarios:
             matched_macro = all_scenarios[scenario_id]
-            
             params = {
                 "num1": parsed_intent.get("num1"),
                 "op": parsed_intent.get("op"),
                 "num2": parsed_intent.get("num2")
             }
-            
-            asyncio.create_task(run_macro_sequence(matched_macro, delay_seconds, params=params))
-            
-            msg = f"{delay_seconds}초후 예약 구동" if delay_seconds > 0 else "매크로 실행"
+            asyncio.create_task(run_macro_sequence(matched_macro, params=params))
             await send_to_dashboard(f"AI 분석 결과 id: {scenario_id} / params: {params}")
-            return {"status": "success", "message": msg}
+            return {"status": "success", "message": f"매크로 실행"}
         else:
             await send_to_dashboard(f"AI Mapping Fail -> 등록되지 않은 시나리오 ID (결과: {scenario_id})")
             return {"status": "fail", "message": "일치하는 매크로 시나리오가 없습니다."}

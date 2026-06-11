@@ -5,6 +5,8 @@ import subprocess
 import threading
 import sys
 import asyncio
+import pyautogui
+import pygetwindow as gw
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -153,6 +155,64 @@ async def websocket_endpoint(websocket: WebSocket):
             await websocket.receive_text()
     except WebSocketDisconnect:
         active_connections.remove(websocket)
+
+@app.websocket("/ws/mouse-tracker")
+async def websocket_mouse_tracker(websocket: WebSocket):
+    await websocket.accept()
+    logger.info("🔌 [Doobot] 마우스 트래커 웹소켓 연결 성공")
+    
+    # 리소스 최적화를 위한 상태 저장 변수들
+    last_x, last_y = -1, -1
+    active_win = None
+    win_title = "알 수 없는 창"
+    win_left, win_top = 0, 0
+    
+    # 창 정보 갱신 타이머 (매번 조회하지 않고 0.5초에 한 번만 갱신)
+    last_win_check_time = 0 
+    
+    try:
+        while True:
+            current_time = time.time()
+            
+            # 1. [최적화] 활성화된 창 정보는 0.5초마다 한 번씩만 새로고침
+            if current_time - last_win_check_time > 0.5:
+                active_win = gw.getActiveWindow()
+                if active_win is not None and active_win.title:
+                    win_title = active_win.title
+                    win_left = active_win.left
+                    win_top = active_win.top
+                last_win_check_time = current_time
+            
+            # 2. 현재 마우스 절대 좌표 구하기 (이 연산은 매우 가볍습니다)
+            abs_x, abs_y = pyautogui.position()
+            
+            # 3. [최적화] 마우스 위치가 이전과 '동일'하면 아무것도 하지 않고 패스!
+            if abs_x == last_x and abs_y == last_y:
+                await asyncio.sleep(0.03) # 0.03초 쉬고 다시 체크 (약 30FPS)
+                continue
+            
+            # 마우스가 움직였다면 이전 좌표 업데이트
+            last_x, last_y = abs_x, abs_y
+            
+            # 4. 상대 좌표 계산
+            rel_x = abs_x - win_left
+            rel_y = abs_y - win_top
+            
+            # 5. 전송 데이터 조립 및 전송
+            data = {
+                "window_title": win_title,
+                "coords": f"{rel_x}x{rel_y}",
+                "abs_coords": f"{abs_x}x{abs_y}"
+            }
+            await websocket.send_json(data)
+            
+            # 대기 시간 조정 (0.03초 = 초당 최대 33번 전송, 체감상 완전히 실시간)
+            await asyncio.sleep(0.03)
+            
+    except WebSocketDisconnect:
+        logger.info("🔌 [Doobot] 마우스 트래커 웹소켓 연결 종료")
+    except Exception as e:
+        logger.error(f"❌ 트래커 오류: {e}")
 
 @app.on_event("shutdown")
 def cleanup_zombie_processes():
