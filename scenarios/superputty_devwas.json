@@ -1,19 +1,18 @@
 {
-  "test": {
-    "description": "테스트",
+  "superputty_dev_was": {
+    "description": "슈퍼푸티 개발 와스 서버 접속",
     "steps": [
 		{
-
-		"action": "check_branch",
-		"target": "appicon_small_superputty.png",
-		"confidence": 0.7,
-		"true": [
-			{ "action": "click", "target": "appicon_small_superputty.png", "confidence": 0.7, "delay": 1 }
-		],
-		"false": [
-			{ "action": "click", "target": "windows_start_btn.png", "confidence": 0.8, "delay": 0.5 },
-			{ "action": "click", "target": "appicon_big_superputty.png", "confidence": 0.8, "delay": 4 }
-		]
+			"action": "check_branch",
+			"target": "appicon_small_superputty.png",
+			"confidence": 0.7,
+			"true": [
+				{ "action": "click", "target": "appicon_small_superputty.png", "confidence": 0.7, "delay": 1 }
+			],
+			"false": [
+				{ "action": "click", "target": "windows_start_btn.png", "confidence": 0.8, "delay": 0.5 },
+				{ "action": "click", "target": "appicon_big_superputty.png", "confidence": 0.8, "delay": 4 }
+			]
 		},
 		{ "action": "dblclick", "target": "superputty_session_devwas.png", "confidence": 0.8, "delay": 2 },
 		{ "action": "type", "text": "free", "delay": 0.2 },
