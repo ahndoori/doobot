@@ -23,7 +23,7 @@ function connectLogWebSocket() {
     const btnMacro = document.getElementById("btn-macro");
     const btnVoice = document.getElementById("btn-voice");
 
-    logSocket = new WebSocket(`ws://${SERVER_HOST}/ws/logs`);
+    logSocket = new WebSocket(`ws://${SERVER_HOST}/ws/dashboard`);
 
     logSocket.onopen = () => {
         log("🚀 [Doobot] 로그 웹소켓 연결 성공");
@@ -65,7 +65,7 @@ function connectMouseWebSocket() {
 
     //const statusEl = document.getElementById("connection-status");
 	const btnTracker=document.getElementById("btn-tracker");
-    mouseSocket = new WebSocket(`ws://${SERVER_HOST}/ws/mouse-tracker`);
+    mouseSocket = new WebSocket(`ws://${SERVER_HOST}/ws/mouse`);
 
     mouseSocket.onopen = () => {
 		updateButtonStatus(btnTracker,true);

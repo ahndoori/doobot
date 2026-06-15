@@ -15,7 +15,6 @@ import cv2
 import numpy as np
 import platform
 import subprocess
-import uvicorn
 from pydantic import BaseModel
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -294,16 +293,16 @@ def run_macro_sequence(macro, params=None):
     dashboard("✅ 시나리오 종료")
 
 
-fastapi_macro = FastAPI(title="Macro Core")
-fastapi_macro.add_middleware(
+macro = FastAPI(title="Macro Core")
+macro.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-@fastapi_macro.post("/api/command")
-def fastapi_macro_api_command(request: CommandRequest):
+@macro.post("/api/command")
+def macro_api_command(request: CommandRequest):
     user_command = request.command
     dashboard(f"📩 macro /api/command '{user_command}'")
 

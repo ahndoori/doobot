@@ -41,19 +41,16 @@ infra_context = {
     "initialized": False
 }
 
-web_logs = []
+dashboard_history = []
 active_connections: List[WebSocket] = []
-
-class LogPayload(BaseModel):
-    message: str
 
 async def add_web_log_and_broadcast(message):
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
     formatted_log = f"[{timestamp}] {message}"
     print(formatted_log)
-    web_logs.append(formatted_log)
-    if len(web_logs) > 100:
-        web_logs.pop(0)
+    dashboard_history.append(formatted_log)
+    if len(dashboard_history) > 100:
+        dashboard_history.pop(0)
     for connection in active_connections:
         try:
             await connection.send_json({"type": "new_log", "log": formatted_log})
@@ -61,18 +58,14 @@ async def add_web_log_and_broadcast(message):
             pass
 
 async def broadcast_infra_status():
-    # 📌 1. Macro 상태 체크 (Thread는 is_alive() 사용)
     macro_alive = (
         infra_context["macro_process"] is not None 
         and infra_context["macro_process"].is_alive()
     )
-    
-    # 📌 2. Voice 상태 체크 (Popen은 poll()이 None이어야 살아있는 것)
     voice_alive = (
         infra_context["voice_process"] is not None 
         and infra_context["voice_process"].poll() is None
     )
-
     for connection in active_connections:
         try:
             await connection.send_json({
@@ -83,15 +76,6 @@ async def broadcast_infra_status():
         except Exception:
             pass
 
-def log_stream_piper(pipe, prefix):
-    try:
-        with pipe:
-            for line in iter(pipe.readline, ''):
-                if line:
-                    print(f"[{prefix}] {line.strip()}", flush=True)
-    except Exception:
-        pass
-
 def spawn_daemon(target):
     env = os.environ.copy()
     env["PYTHONUNBUFFERED"] = "1"
@@ -100,8 +84,8 @@ def spawn_daemon(target):
         def run_uvicorn():
             try:
                 import uvicorn
-                from macro import fastapi_macro
-                uvicorn.run(fastapi_macro, host="127.0.0.1", port=4445, log_level="info")
+                import macro
+                uvicorn.run(macro.macro, host="127.0.0.1", port=4445, log_level="info")
             except Exception as e:
                 print(f"⛈️ spawn_daemon fastapi_macro Exception {e}")
         proc_thread = threading.Thread(target=run_uvicorn, daemon=True)
@@ -112,22 +96,17 @@ def spawn_daemon(target):
         proc = subprocess.Popen(
             [VENV_PYTHON, "-u", "voice_listener.py"],
             cwd=BASE_DIR, 
-            stdout=subprocess.PIPE, 
-            stderr=subprocess.STDOUT, 
-            text=True, 
-            encoding="utf-8",
             env=env
         )
         infra_context["voice_process"] = proc
-        threading.Thread(target=log_stream_piper, args=(proc.stdout, "Voice-Client"), daemon=True).start()
 
 @app.get("/", response_class=HTMLResponse)
 async def index_page(request: Request):
     return templates.TemplateResponse(request=request, name="index.html")
 
 @app.post("/api/push-log")
-async def push_log_endpoint(payload: LogPayload):
-    await add_web_log_and_broadcast(payload.message)
+async def fastapi_api_push_log(payload: dict):
+    await add_web_log_and_broadcast(payload.get("message", ""))
     return {"status": "ok"}
 
 @app.post("/api/infra/toggle/{target}")
@@ -160,22 +139,22 @@ async def toggle_infrastructure_status(target: str):
     await broadcast_infra_status()
     return {"status": "ok"}
 
-@app.websocket("/ws/logs")
+@app.websocket("/ws/dashboard")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     active_connections.append(websocket)
     try:
-        await websocket.send_json({"type": "init_logs", "logs": web_logs})
+        await websocket.send_json({"type": "init_logs", "logs": dashboard_history})
         await broadcast_infra_status()
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
         active_connections.remove(websocket)
 
-@app.websocket("/ws/mouse-tracker")
+@app.websocket("/ws/mouse")
 async def websocket_mouse_tracker(websocket: WebSocket):
     await websocket.accept()
-    logger.info("☀️ /ws/mouse-tracker")
+    logger.info("☀️ /ws/mouse")
     last_x, last_y = -1, -1
     active_win = None
     win_title = "알 수 없는 창"
