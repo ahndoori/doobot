@@ -17,12 +17,12 @@
       {
         "action": "press",
         "key": "ctrl+l",
-        "delay": 2
+        "delay": 3
       },
       {
         "action": "type",
         "text": "weather.naver.com",
-        "delay": 0.5
+        "delay": 0.2
       },
       {
         "action": "press",
