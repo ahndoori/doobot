@@ -1,5 +1,5 @@
 {
-  "browser_youtube": {
+  "browser_youtube_open": {
     "description": "브라우저 실행, 유튜브 사이트 접속",
     "steps": [
       {

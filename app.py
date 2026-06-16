@@ -36,8 +36,8 @@ IS_WINDOWS = sys.platform.startswith("win")
 VENV_PYTHON = os.path.join(BASE_DIR, ".venv", "Scripts", "python.exe") if IS_WINDOWS else os.path.join(BASE_DIR, ".venv", "bin", "python")
 
 infra_context = {
-    "macro_process": None, # Thread 객체가 저장됨
-    "voice_process": None, # Subprocess.Popen 객체가 저장됨
+    "macro_process": None,
+    "voice_process": None,
     "initialized": False
 }
 
@@ -109,26 +109,54 @@ async def fastapi_api_push_log(payload: dict):
     await add_web_log_and_broadcast(payload.get("message", ""))
     return {"status": "ok"}
 
+@app.post("/api/damon/macro")
+async def api_demon_macro(target: str):
+    key = "macro_process"
+    proc = infra_context.get(key)
+    if proc is not None and proc.is_alive():
+        infra_context[key] = None
+        await add_web_log_and_broadcast("🛬 stop demon LLM/Macro")
+    else:
+        await add_web_log_and_broadcast("🛫 start demon LLM/Macro")
+        spawn_daemon("macro")
+        await asyncio.sleep(0.5)
+    await broadcast_infra_status()
+    return {"status": "ok"}
+
+@app.post("/api/damon/voice")
+async def api_demon_voice(target: str):
+    key = "voice_process"
+    proc = infra_context.get(key)
+    if proc is not None and proc.poll() is None:
+        if proc is not None:
+            try:
+                proc.terminate()
+                proc.wait(timeout=1.0) 
+            except Exception:
+                proc.kill()
+        infra_context[key] = None
+        await add_web_log_and_broadcast("🛬 stop demon VoiceListener")
+    else:
+        await add_web_log_and_broadcast("🛫 start demon VoiceListener")
+        spawn_daemon("voice")
+        await asyncio.sleep(0.5)
+    await broadcast_infra_status()
+    return {"status": "ok"}
+
 @app.post("/api/infra/toggle/{target}")
 async def toggle_infrastructure_status(target: str):
     if target not in ["macro", "voice"]:
         return {"status": "error", "message": "잘못된 타겟 컴포넌트"}
-    
     key = f"{target}_process"
     proc = infra_context[key]
-    
-    # 📌 3. 타겟 종류에 따라 살아있는지 체크하는 방식을 분리
     if target == "macro":
         is_alive = proc is not None and proc.is_alive()
-    else:  # voice 인 경우
+    else:
         is_alive = proc is not None and proc.poll() is None
-
     if is_alive:
-        # 📌 4. 끌 때 voice 프로세스는 강제로 안전하게 종료(terminate)해줌
         if target == "voice" and proc is not None:
             proc.terminate()
-            proc.wait() # 완전히 죽을 때까지 대기 (좀비 방지)
-            
+            proc.wait()
         infra_context[key] = None
         await add_web_log_and_broadcast(f"🛬 stop demon {target}")
     else:
@@ -183,7 +211,6 @@ async def websocket_mouse_tracker(websocket: WebSocket):
                 "abs_coords": f"{abs_x}x{abs_y}"
             }
             await websocket.send_json(data)
-            
             await asyncio.sleep(0.03)
     except WebSocketDisconnect:
         logger.info("except WebSocketDisconnect")
@@ -192,7 +219,6 @@ async def websocket_mouse_tracker(websocket: WebSocket):
 
 @app.on_event("shutdown")
 def cleanup_zombie_processes():
-    # 📌 5. FastAPI 서버가 꺼질 때 보이스 백그라운드 프로세스도 깨끗하게 청소
     if infra_context["voice_process"] is not None:
         proc = infra_context["voice_process"]
         if proc.poll() is None:

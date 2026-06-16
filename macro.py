@@ -42,11 +42,7 @@ OP_IMAGE_MAP = {
 class CommandRequest(BaseModel):
     command: str
 
-def log(msg: str):
-    logger.info(f"==> {msg}")
-
 def dashboard(msg:str,tts:bool=False):
-    #log(msg)
     try:
         requests.post(WEB_LOG_URL, json={"message": msg}, timeout=0.5)
     except Exception:
@@ -66,20 +62,19 @@ def tts_out(text):
                 str_text = str(text)
                 speaker.Speak(str_text, 0) 
             except ImportError:
-                log("❌ tts_out SAPI.SpVoice ImportError")
+                logger.error("❌ tts_out SAPI.SpVoice ImportError")
         else:
             logger.warning(f"⚠️ 지원하지 않는 OS 환경입니다: {current_os}")
     except Exception as e:
-        log(f"❌ tts_out Exception {str(e)}")
+        logger.error(f"❌ tts_out Exception {str(e)}")
 
-def click_sync(image_name, confidence_level=0.7, all_click_with_ctrl=False, double_click=False):
+def click_sync(step,image_name, confidence_level=0.7, all_click_with_ctrl=False, double_click=False):
+    logger.info(f"➡️ click_sync {step}")
     try:
         image_path = os.path.join(VISION_DIR, image_name)
         if not os.path.exists(image_path):
-            log(f"❌ 비전 파일 유실: [{image_path}]")
+            logger.error(f"❌ 비전 파일 유실: [{image_path}]")
             return False
-
-        logger.info(f"🔍 [OpenCV 매칭 가동] ➡️ {image_name} (모드: {'다중/새탭' if all_click_with_ctrl else '단일/일반'})")
         screen = ImageGrab.grab()
         screen_np = np.array(screen)
         screen_gray = cv2.cvtColor(screen_np, cv2.COLOR_RGB2GRAY)
@@ -93,8 +88,8 @@ def click_sync(image_name, confidence_level=0.7, all_click_with_ctrl=False, doub
             min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
             logger.info(f"📊 매칭 유사도 분석 결과 ➡️ 최고 점수: {max_val:.4f} (목표값: {confidence_level})")
             if max_val >= confidence_level:
-                cx = int(max_loc[0] + w / 2)
-                cy = int(max_loc[1] + h / 2)
+                cx = int(max_loc[0] + w / 2) +step.get("x",0)
+                cy = int(max_loc[1] + h / 2) +step.get("y",0)
                 pyautogui.moveTo(cx, cy, duration=0.2)
                 pyautogui.click()
                 if double_click: pyautogui.click()
@@ -123,34 +118,45 @@ def click_sync(image_name, confidence_level=0.7, all_click_with_ctrl=False, doub
                 pyautogui.keyUp('ctrl')
             return True
     except Exception as e:
-        log(f"⚠️ OpenCV 비전 엔진 크래시: {str(e)}")
+        logger.error(f"⚠️ OpenCV 비전 엔진 크래시: {str(e)}")
         return False
 
 def vision_sync(image_name, confidence_level=0.7):
     try:
         image_path = os.path.join(VISION_DIR, image_name)
         if not os.path.exists(image_path):
-            log(f"❌ 비전 파일 유실: [{image_path}]")
+            logger.error(f"❌ 비전 파일 유실: [{image_path}]")
             return False
         screen = ImageGrab.grab()
         screen_np = np.array(screen)
         screen_gray = cv2.cvtColor(screen_np, cv2.COLOR_RGB2GRAY)
-        
         template = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
         if template is None: 
             return False
         w, h = template.shape[::-1]
-        
         res = cv2.matchTemplate(screen_gray, template, cv2.TM_CCOEFF_NORMED)
+
+        '''
+        screen_bin = cv2.adaptiveThreshold(
+            screen_gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
+        )
+        _, template_bin = cv2.threshold(template, 50, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+        res = cv2.matchTemplate(screen_bin, template_bin, cv2.TM_CCOEFF_NORMED)
+        '''
+
         min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
         logger.info(f"📊 매칭 유사도 분석 결과 ➡️ 최고 점수: {max_val:.4f} (목표값: {confidence_level})")
+
         if max_val >= confidence_level:
-            return True
+            cx = int(max_loc[0] + w / 2)
+            cy = int(max_loc[1] + h / 2)
+            #return True
+            return (cx, cy)
         else:
             logger.info("📊 임계값을 넘는 매칭 아이콘이 없습니다.")
             return False
     except Exception as e:
-        log(f"⚠️ OpenCV 비전 엔진 크래시: {str(e)}")
+        logger.error(f"⛈️ vision_sync Exception {str(e)}")
         return False
 
 def load_all_scenarios():
@@ -164,25 +170,35 @@ def load_all_scenarios():
             with open(file_path, "r", encoding="utf-8") as f:
                 merged_scenarios.update(json.load(f))
         except Exception as e:
-            log(f"시나리오 로드 실패: {e}")
+            logger.error(f"시나리오 로드 실패: {e}")
     return merged_scenarios
 
 
-def run_macro_step(step, params):
+def run_macro_step(step,params):
+    logger.info(f"➡️ run_macro_step {step} {params}")
     action = step.get("action")
-    if action in ["dblclick", "click", "vision_click"]:
+    if action == "check_youtube_shorts":
+        import rules
+        return rules.check_youtube_shorts(step)
+    elif action == "hover":
+        if step.get("target"):
+            position=vision_sync(step.get("target"), step.get("confidence", 0.6))
+            if position: pyautogui.moveTo(position[0]+step.get("x",0),position[1]+step.get("y",0),duration=0.3)
+        else:
+            pyautogui.moveTo(step.get("x", 0), step.get("y", 0), duration=0.3)
+    elif action in ["dblclick", "click", "vision_click"]:
         target_img = step.get("target")
         conf = step.get("confidence", 0.6)
         try:            
-            success = click_sync(target_img, conf, False, True if action == "dblclick" else False)
+            success = click_sync(step,target_img, conf, False, True if action == "dblclick" else False)
         except Exception as thread_err:
-            log(f"⚠️ 매크로 실행 오류: {str(thread_err)}")
+            logger.error(f"⚠️ 매크로 실행 오류: {str(thread_err)}")
             success = False
         if not success:
             debug_path = os.path.join(BASE_DIR, "debug_screenshot.png")
             try:
                 ImageGrab.grab().save(debug_path)
-                log(f"📸 [저장 완료] 중단 시점 스냅샷 ➡️ {debug_path}")
+                logger.info(f"📸 [저장 완료] 중단 시점 스냅샷 ➡️ {debug_path}")
             except:
                 pass
             dashboard(f"❌ 비전 타겟 매칭 실패 [{target_img}] 시퀀스 중단")
@@ -192,7 +208,7 @@ def run_macro_step(step, params):
     elif action == "click_all":
         target_img = step.get("target")
         conf = step.get("confidence", 0.7)
-        success = click_sync(target_img, conf, True)
+        success = click_sync(step,target_img, conf, True)
         if not success:
             dashboard(f"⚠️ 다중 매칭 실패 혹은 타겟 없음: [{target_img}]")
             return False
@@ -204,7 +220,7 @@ def run_macro_step(step, params):
         target_img = OP_IMAGE_MAP.get(op_sign, "calc_plus.png")
         conf = step.get("confidence", 0.55)
         try:
-            success = click_sync(target_img, conf, False)
+            success = click_sync(step,target_img, conf, False)
         except Exception:
             success = False
         if not success:
@@ -240,7 +256,7 @@ def run_macro_step(step, params):
             debug_path = os.path.join(BASE_DIR, "debug_screenshot.png")
             try:
                 ImageGrab.grab().save(debug_path)
-                log(f"📸 [타임아웃] 중단 시점 스냅샷 ➡️ {debug_path}")
+                logger.info(f"📸 [타임아웃] 중단 시점 스냅샷 ➡️ {debug_path}")
             except Exception:
                 pass
             dashboard(f"❌ [{target_img}] 지정된 시간 내에 찾지 못함. 시퀀스 중단")
@@ -266,27 +282,25 @@ def run_macro_step(step, params):
 def run_macro_sequence(macro, params=None):
     if params is None: params = {}
     dashboard(f"🔥 매크로 시퀀스 ➡️ [{macro.get('description', '')}]")
-
     for idx, step in enumerate(macro.get("steps", [])):
         action = step.get("action")
-
         if action == "check_branch":
             target_img = step.get("target")
             conf = step.get("confidence", 0.7)
-            exists = vision_sync(target_img, conf)
+            result = vision_sync(target_img, conf)
+            if not result and step.get("target2"): result = vision_sync(step.get("target2"), conf)
             branch_steps = []
-            if exists:
-                dashboard(f"🔍 조건 체크 [성공]: [{target_img}] 발견. steps_true 실행.")
-                branch_steps = step.get("true", [])
+            if result:
+                dashboard(f"🔍 check_branch success {target_img}")
+                branch_steps = step.get("true",[])
             else:
-                dashboard(f"🔍 조건 체크 [실패]: [{target_img}] 미발견. steps_false 실행.")
-                branch_steps = step.get("false", [])
+                dashboard(f"🔍 check_branch failure {target_img}")
+                branch_steps = step.get("false",[])
             for b_step in branch_steps:
                 success = run_macro_step(b_step, params)
                 if not success: return
                 time.sleep(b_step.get("delay", 1.0))
             continue
-            
         success = run_macro_step(step, params)
         if not success: break
         time.sleep(step.get("delay", 1.0))
@@ -310,7 +324,7 @@ def macro_api_command(request: CommandRequest):
         rule_hint = rules.pre_analyze_intent(user_command)
         logger.info(f"💡 RULE-HINT 분석 성공: {rule_hint}")
     except Exception as e:
-        log(f"⛈️ [Rule Pre-Analyze 에러]: {str(e)}")
+        logger.error(f"⛈️ [Rule Pre-Analyze 에러]: {str(e)}")
         return {"status": "error", "message": str(e)}
 
     all_scenarios = load_all_scenarios()
@@ -337,7 +351,7 @@ def macro_api_command(request: CommandRequest):
 
         json_match = re.search(r"\{.*\}", response, re.DOTALL)
         if not json_match:
-            log("[PARSING ERROR] 응답에서 JSON 형태를 찾을 수 없습니다.")
+            logger.error("[PARSING ERROR] 응답에서 JSON 형태를 찾을 수 없습니다.")
             raise ValueError("OLLAMA JSON 응답 파싱 에러")
             
         parsed_intent = json.loads(json_match.group(0))
@@ -360,5 +374,5 @@ def macro_api_command(request: CommandRequest):
             dashboard(f"AI Mapping Fail -> 등록되지 않은 시나리오 ID (결과: {scenario_id})")
             return {"status": "fail", "message": "일치하는 매크로 시나리오가 없습니다."}
     except Exception as e:
-        log(f"⛈️ [Ollama 연산/파싱 중 크래시]: {str(e)}")
+        logger.error(f"⛈️ [Ollama 연산/파싱 중 크래시]: {str(e)}")
         return {"status": "error", "message": str(e)}
