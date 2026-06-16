@@ -129,7 +129,9 @@ def check_youtube_shorts(step) -> bool:
             no_change_count += 1
             if no_change_count >= 5:
                 print("⚠️ 재생 멈춤(일시정지/버퍼링) 감지 ➡️ 스페이스바 입력")
-                pyautogui.press('space')
+                pyautogui.moveTo(current_x,current_y-100, duration=0.5)
+                pyautogui.click()
+                pyautogui.moveTo(current_x,current_y,duration=0.5)
                 no_change_count = 0  # 카운트 초기화
         else:
             no_change_count = 0

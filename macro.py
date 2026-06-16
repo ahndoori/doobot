@@ -304,7 +304,10 @@ def run_macro_sequence(macro, params=None):
         success = run_macro_step(step, params)
         if not success: break
         time.sleep(step.get("delay", 1.0))
-    dashboard("✅ 시나리오 종료")
+    if macro.get('loop'):
+        run_macro_sequence(macro, params)
+    else:
+        dashboard("✅ 시나리오 종료")
 
 
 macro = FastAPI(title="Macro Core")
