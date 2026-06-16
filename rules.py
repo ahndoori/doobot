@@ -124,15 +124,13 @@ def check_youtube_shorts(step) -> bool:
             continue
             
         if current_red_count > 0 and current_red_count == last_red_count:
-            # 영상이 다 안 끝났는데(current_red_count가 max_red_count보다 작음) 값이 멈췄을 때만 정지로 인정할지, 
-            # 혹은 끝까지 찼는데 다음으로 안 넘어가고 버벅일 때도 포함할지 안전하게 체크
             no_change_count += 1
             if no_change_count >= 5:
-                print("⚠️ 재생 멈춤(일시정지/버퍼링) 감지 ➡️ 스페이스바 입력")
+                print("➡️ 멈춤 감지")
                 pyautogui.moveTo(current_x,current_y-100, duration=0.5)
                 pyautogui.click()
                 pyautogui.moveTo(current_x,current_y,duration=0.5)
-                no_change_count = 0  # 카운트 초기화
+                no_change_count = 0
         else:
             no_change_count = 0
         last_red_count = current_red_count
