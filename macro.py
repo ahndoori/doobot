@@ -16,6 +16,7 @@ import numpy as np
 import platform
 import subprocess
 import keyboard
+import hotkey
 from pydantic import BaseModel
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
@@ -44,6 +45,16 @@ OP_IMAGE_MAP = {
     "*": "calc_multiply.png",
     "/": "calc_devide.png"
 }
+
+macro = FastAPI(title="Macro Core")
+macro.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+hotkey.init_hotkeys()
 
 class CommandRequest(BaseModel):
     command: str
@@ -124,14 +135,14 @@ def click_sync(step,image_name, confidence_level=0.7, all_click_with_ctrl=False,
                 pyautogui.keyUp('ctrl')
             return True
     except Exception as e:
-        logger.error(f"⚠️ OpenCV 비전 엔진 크래시: {str(e)}")
+        logger.error(f"⚠️ click_sync Exception {str(e)}")
         return False
 
 def vision_sync(image_name, confidence_level=0.7):
     try:
         image_path = os.path.join(VISION_DIR, image_name)
         if not os.path.exists(image_path):
-            logger.error(f"❌ 비전 파일 유실: [{image_path}]")
+            logger.error(f"❌ SOURCE FILE NOT FOUND {image_path}")
             return False
         screen = ImageGrab.grab()
         screen_np = np.array(screen)
@@ -141,17 +152,8 @@ def vision_sync(image_name, confidence_level=0.7):
             return False
         w, h = template.shape[::-1]
         res = cv2.matchTemplate(screen_gray, template, cv2.TM_CCOEFF_NORMED)
-
-        '''
-        screen_bin = cv2.adaptiveThreshold(
-            screen_gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
-        )
-        _, template_bin = cv2.threshold(template, 50, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
-        res = cv2.matchTemplate(screen_bin, template_bin, cv2.TM_CCOEFF_NORMED)
-        '''
-
         min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
-        logger.info(f"📊 매칭 유사도 분석 결과 ➡️ 최고 점수: {max_val:.4f} (목표값: {confidence_level})")
+        logger.info(f"📊 매칭 유사도 {max_val:.4f}SCORE (TARGET:{confidence_level})")
 
         if max_val >= confidence_level:
             cx = int(max_loc[0] + w / 2)
@@ -159,7 +161,7 @@ def vision_sync(image_name, confidence_level=0.7):
             #return True
             return (cx, cy)
         else:
-            logger.info("📊 임계값을 넘는 매칭 아이콘이 없습니다.")
+            logger.info("📊 vision_sync FAILURE")
             return False
     except Exception as e:
         logger.error(f"⛈️ vision_sync Exception {str(e)}")
@@ -176,7 +178,7 @@ def load_all_scenarios():
             with open(file_path, "r", encoding="utf-8") as f:
                 merged_scenarios.update(json.load(f))
         except Exception as e:
-            logger.error(f"시나리오 로드 실패: {e}")
+            logger.error(f"load_all_scenarios Exception {e}")
     return merged_scenarios
 
 
@@ -208,7 +210,7 @@ def run_macro_step(step,params):
                 logger.info(f"📸 [저장 완료] 중단 시점 스냅샷 ➡️ {debug_path}")
             except:
                 pass
-            dashboard(f"❌ 비전 타겟 매칭 실패 [{target_img}] 시퀀스 중단")
+            dashboard(f"❌ 비전 타겟매칭 실패 [{target_img}] 시퀀스 중단")
             return False
         dashboard(f"🎯 비전 클릭: [{target_img}]")
 
@@ -217,7 +219,7 @@ def run_macro_step(step,params):
         conf = step.get("confidence", 0.7)
         success = click_sync(step,target_img, conf, True)
         if not success:
-            dashboard(f"⚠️ 다중 매칭 실패 혹은 타겟 없음: [{target_img}]")
+            dashboard(f"⚠️ 다중매칭 실패 혹은 타겟 없음: [{target_img}]")
             return False
         else:
             dashboard(f"✅ 모든 [{target_img}] 타겟 새 탭 열기 완료")
@@ -288,34 +290,6 @@ def run_macro_step(step,params):
     return True
 
 
-
-
-def handle_hotkey_trigger():
-    global is_running, stop_requested, last_executed_scenario
-    with threading_lock:
-        if is_running:
-            dashboard("⌨️ REQUEST STOP")
-            stop_requested = True
-        else:
-            if last_executed_scenario:
-                macro_data = last_executed_scenario.get("macro")
-                param_data = last_executed_scenario.get("params")
-                
-                dashboard(f"⌨️ REQUEST RUN LAST SCENARIO: {macro_data.get('description','')}")
-                is_running = True
-                stop_requested = False
-                
-                threading.Thread(
-                    target=run_macro_sequence, 
-                    args=(macro_data, param_data), 
-                    daemon=True
-                ).start()
-            else:
-                dashboard("⌨️ REQUEST RUN, NO LAST SCENARIO")
-
-keyboard.add_hotkey('ctrl+shift+q', handle_hotkey_trigger)
-logger.info("⌨️ 단축키 매핑 완료: [Ctrl+Shift+Q] -> 스레드 제어 활성화")
-
 def run_macro_sequence(macro, params=None):
     global is_running, stop_requested
     if params is None: params = {}
@@ -362,15 +336,6 @@ def run_macro_sequence(macro, params=None):
                 stop_requested = False
             dashboard("✅ 시나리오 종료")
 
-
-macro = FastAPI(title="Macro Core")
-macro.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 @macro.post("/api/command")
 def macro_api_command(request: CommandRequest):
     user_command = request.command
@@ -380,7 +345,7 @@ def macro_api_command(request: CommandRequest):
         rule_hint = rules.pre_analyze_intent(user_command)
         logger.info(f"💡 RULE-HINT 분석 성공: {rule_hint}")
     except Exception as e:
-        logger.error(f"⛈️ [Rule Pre-Analyze 에러]: {str(e)}")
+        logger.error(f"⛈️ pre_analyze_intent Exception {str(e)}")
         return {"status": "error", "message": str(e)}
 
     all_scenarios = load_all_scenarios()
