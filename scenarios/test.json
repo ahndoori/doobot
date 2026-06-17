@@ -2,7 +2,7 @@
   "test": {
     "description": "테스트",
     "steps": [
-		{"action":"check_wait","target":"naver_point_big.png","confidence":0.7,"interval":0.5,"limit":5},
+		{"action":"check_wait","target":"naver_point_big.png","confidence":0.7,"interval":1,"limit":5},
 		{
 		"action": "check_branch",
 		"target": "appicon_small_superputty.png",

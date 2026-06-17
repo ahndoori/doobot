@@ -15,7 +15,6 @@ import cv2
 import numpy as np
 import platform
 import subprocess
-import keyboard
 import hotkey
 from pydantic import BaseModel
 from fastapi import FastAPI, HTTPException, BackgroundTasks
@@ -45,6 +44,8 @@ OP_IMAGE_MAP = {
     "*": "calc_multiply.png",
     "/": "calc_devide.png"
 }
+SCALE_X = 1.0
+SCALE_Y = 1.0
 
 macro = FastAPI(title="Macro Core")
 macro.add_middleware(
@@ -58,6 +59,18 @@ hotkey.init_hotkeys()
 
 class CommandRequest(BaseModel):
     command: str
+
+def init_global_scales():
+    global SCALE_X, SCALE_Y
+    try:
+        screen_w, screen_h = pyautogui.size()
+        temp_screen = np.array(pyautogui.screenshot())
+        SCALE_X = temp_screen.shape[1] / screen_w
+        SCALE_Y = temp_screen.shape[0] / screen_h
+        logger.info(f"🖥️ 디스플레이 배율 감지 완료 ➡️ SCALE_X: {SCALE_X}, SCALE_Y: {SCALE_Y}")
+    except Exception as e:
+        logger.error(f"❌ 배율 초기화 실패 (기본값 1.0 사용): {e}")
+init_global_scales()
 
 def dashboard(msg:str,tts:bool=False):
     try:
@@ -93,6 +106,7 @@ def click_sync(step,image_name, confidence_level=0.7, all_click_with_ctrl=False,
             logger.error(f"❌ 비전 파일 유실: [{image_path}]")
             return False
         screen = ImageGrab.grab()
+        #screen = pyautogui.screenshot()
         screen_np = np.array(screen)
         screen_gray = cv2.cvtColor(screen_np, cv2.COLOR_RGB2GRAY)
         template = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
@@ -105,8 +119,15 @@ def click_sync(step,image_name, confidence_level=0.7, all_click_with_ctrl=False,
             min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
             logger.info(f"📊 매칭 유사도 분석 결과 ➡️ 최고 점수: {max_val:.4f} (목표값: {confidence_level})")
             if max_val >= confidence_level:
+                '''
                 cx = int(max_loc[0] + w / 2) +step.get("x",0)
                 cy = int(max_loc[1] + h / 2) +step.get("y",0)
+                logger.info(f'{cx}x{cy}, {step.get("x",0)}x{step.get("y",0)}')
+                '''
+                cx = int((max_loc[0] + w / 2) / SCALE_X) + step.get("x", 0)
+                cy = int((max_loc[1] + h / 2) / SCALE_Y) + step.get("y", 0)
+                logger.info(f'🎯 보정된 마우스 이동 좌표: {cx}x{cy}, 상대오프셋: {step.get("x",0)}x{step.get("y",0)}')
+
                 pyautogui.moveTo(cx, cy, duration=0.2)
                 pyautogui.click()
                 if double_click: pyautogui.click()
@@ -144,7 +165,8 @@ def vision_sync(image_name, confidence_level=0.7):
         if not os.path.exists(image_path):
             logger.error(f"❌ SOURCE FILE NOT FOUND {image_path}")
             return False
-        screen = ImageGrab.grab()
+        #screen = ImageGrab.grab()
+        screen = pyautogui.screenshot()
         screen_np = np.array(screen)
         screen_gray = cv2.cvtColor(screen_np, cv2.COLOR_RGB2GRAY)
         template = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
@@ -156,9 +178,10 @@ def vision_sync(image_name, confidence_level=0.7):
         logger.info(f"📊 매칭 유사도 {max_val:.4f}SCORE (TARGET:{confidence_level})")
 
         if max_val >= confidence_level:
-            cx = int(max_loc[0] + w / 2)
-            cy = int(max_loc[1] + h / 2)
+            cx = int((max_loc[0] + w / 2) / SCALE_X)
+            cy = int((max_loc[1] + h / 2) / SCALE_Y)
             #return True
+            logger.info(f'{cx} {cy}')
             return (cx, cy)
         else:
             logger.info("📊 vision_sync FAILURE")
@@ -192,9 +215,15 @@ def run_macro_step(step,params):
     elif action == "hover":
         if step.get("target"):
             position=vision_sync(step.get("target"), step.get("confidence", 0.6))
-            if position: pyautogui.moveTo(position[0]+step.get("x",0),position[1]+step.get("y",0),duration=0.3)
+            if position:
+                pyautogui.moveTo(position[0]+step.get("x",0),position[1]+step.get("y",0),duration=0.3)
+                return True
+            else:
+                return False
         else:
             pyautogui.moveTo(step.get("x", 0), step.get("y", 0), duration=0.3)
+            return True
+
     elif action in ["dblclick", "click", "vision_click"]:
         target_img = step.get("target")
         conf = step.get("confidence", 0.6)
@@ -204,16 +233,16 @@ def run_macro_step(step,params):
             logger.error(f"⚠️ 매크로 실행 오류: {str(thread_err)}")
             success = False
         if not success:
-            debug_path = os.path.join(BASE_DIR, "debug_screenshot.png")
-            try:
-                ImageGrab.grab().save(debug_path)
-                logger.info(f"📸 [저장 완료] 중단 시점 스냅샷 ➡️ {debug_path}")
-            except:
-                pass
+            #debug_path = os.path.join(BASE_DIR, "debug_screenshot.png")
+            #try:
+            #    ImageGrab.grab().save(debug_path)
+            #    logger.info(f"📸 [저장 완료] 중단 시점 스냅샷 ➡️ {debug_path}")
+            #except:
+            #    pass
             dashboard(f"❌ 비전 타겟매칭 실패 [{target_img}] 시퀀스 중단")
             return False
-        dashboard(f"🎯 비전 클릭: [{target_img}]")
-
+        dashboard(f"🎯 CLICK: {target_img}")
+        return True
     elif action == "click_all":
         target_img = step.get("target")
         conf = step.get("confidence", 0.7)
@@ -233,9 +262,9 @@ def run_macro_step(step,params):
         except Exception:
             success = False
         if not success:
-            debug_path = os.path.join(BASE_DIR, "debug_screenshot.png")
-            try: ImageGrab.grab().save(debug_path)
-            except: pass
+            #debug_path = os.path.join(BASE_DIR, "debug_screenshot.png")
+            #try: ImageGrab.grab().save(debug_path)
+            #except: pass
             dashboard(f"❌ 연산자 비전 매칭 실패 [{target_img}] 시퀀스 중단")
             return False
         dashboard(f"🎯 연산자 비전 클릭: [{target_img}] ({op_sign})")
@@ -264,12 +293,12 @@ def run_macro_step(step,params):
 
         if not found:
             if stop_requested: return False
-            debug_path = os.path.join(BASE_DIR, "debug_screenshot.png")
-            try:
-                ImageGrab.grab().save(debug_path)
-                logger.info(f"📸 [타임아웃] 중단 시점 스냅샷 ➡️ {debug_path}")
-            except Exception:
-                pass
+            #debug_path = os.path.join(BASE_DIR, "debug_screenshot.png")
+            #try:
+            #    ImageGrab.grab().save(debug_path)
+            #    logger.info(f"📸 [타임아웃] 중단 시점 스냅샷 ➡️ {debug_path}")
+            #except Exception:
+            #    pass
             dashboard(f"❌ [{target_img}] 지정된 시간 내에 찾지 못함. 시퀀스 중단")
             return False
 
@@ -399,7 +428,7 @@ def macro_api_command(request: CommandRequest):
 
             threading.Thread(target=run_macro_sequence, args=(matched_macro, params), daemon=True).start()
             
-            dashboard(f"🤖 AI분석: {scenario_id}, PARAMETERS: {params}", True)
+            dashboard(f"🤖 AI분석: {scenario_id}, PARAMETERS: {params}")
             return {"status": "success", "message": f"매크로 실행"}
         else:
             dashboard(f"AI Mapping Fail -> 등록되지 않은 시나리오 ID (결과: {scenario_id})")

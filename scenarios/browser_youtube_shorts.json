@@ -3,15 +3,15 @@
     "description": "유튜브 쇼츠 자동넘김",
 	"loop":true,
     "steps": [
-		{"action":"check_wait","target":"youtube_shorts_comment.png","confidence":0.7,"interval":1,"limit":5},
+		{"action":"check_wait","target":"youtube_shorts_share.png","confidence":0.7,"interval":1,"limit":5},
 		{
 			"action": "check_branch",
 			"target": "youtube_shorts_remix.png",
-			"target2": "youtube_shorts_remix2.png",
-			"confidence": 0.8,
+			"targetXXXX": "youtube_shorts_remix2.png",
+			"confidence": 0.7,
 			"move": true,
 			"true": [
-				{ "action": "click", "target": "youtube_shorts_next.png", "confidence": 0.5, "delay": 0.5 , "x":0, "y":50 },
+				{ "action": "click", "target": "youtube_shorts_next.png", "confidence": 0.7, "delay": 0.5 , "x":0, "y":50 },
 				{ "action": "hover", "delay": 1, "target": "youtube_shorts_comment.png", "confidence": 0.7, "x":-45, "y":255 },
 				{ "action":"check_youtube_shorts", "delay":0.8, "limit":120 }
 			]

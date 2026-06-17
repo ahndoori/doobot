@@ -1,6 +1,6 @@
 import threading
-import keyboard
 import logging
+from pynput import keyboard  # pynput의 keyboard 모듈 임포트
 
 logger = logging.getLogger("Macro-Hotkey")
 
@@ -31,5 +31,14 @@ def init_hotkeys():
                 else:
                     macro.dashboard("⌨️ REQUEST RUN, NO LAST SCENARIO")
 
-    keyboard.add_hotkey('ctrl+shift+q', handle_hotkey_trigger)
-    logger.info("⌨️ 단축키 매핑 완료: [Ctrl+Shift+Q] -> hotkey.py 완전 분리")
+    # 1. 단축키와 실행할 함수를 딕셔너리로 매핑합니다. (pynput 포맷에 맞춤)
+    # pynput에서는 조합키를 '<ctrl>+<shift>+q' 와 같은 형태로 표현합니다.
+    hotkey_map = {
+        '<ctrl>+<shift>+q': handle_hotkey_trigger
+    }
+
+    # 2. 리스너를 생성하고 백그라운드 스레드로 시작합니다.
+    listener = keyboard.GlobalHotKeys(hotkey_map)
+    listener.start()  # non-blocking 방식으로 백그라운드에서 계속 대기함
+
+    logger.info("⌨️ 단축키 매핑 완료: [Ctrl+Shift+Q] -> hotkey.py 완전 분리 (pynput)")
