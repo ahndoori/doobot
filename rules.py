@@ -69,12 +69,12 @@ def pre_analyze_intent(user_command: str) -> dict:
     return hint_context
 
 
-def check_youtube_shorts(step) -> bool:
+def check_youtube_shorts(step,stop_requested=None) -> bool:
     current_x, current_y = pyautogui.position()
     start_y = current_y - 3
     end_y = current_y + 3
     
-    start_x = current_x - 500  
+    start_x = current_x - 500
     end_x = current_x
     
     max_red_count = 0
@@ -88,6 +88,7 @@ def check_youtube_shorts(step) -> bool:
     no_change_count = 0
     
     while time.time() - start_time < timeout:
+        if stop_requested and stop_requested(): return False
         screen = ImageGrab.grab()
         screen_np = np.array(screen)
         
@@ -115,19 +116,21 @@ def check_youtube_shorts(step) -> bool:
             
             if is_red_pixel_found:
                 current_red_count += 1
-                
+
+        '''
         # SHAKE MOUSE (바가 사라졌을 때 방어)
         if current_red_count == 0 and max_red_count > 15:
             pyautogui.moveTo(current_x - 10, current_y, duration=0.05)
             pyautogui.moveTo(current_x, current_y, duration=0.05)
             time.sleep(interval)
             continue
+        '''
             
-        if current_red_count > 0 and current_red_count == last_red_count:
+        if current_red_count == last_red_count: #current_red_count > 0 and
             no_change_count += 1
             if no_change_count >= 5:
-                print("➡️ 멈춤 감지")
-                pyautogui.moveTo(current_x,current_y-100, duration=0.5)
+                print("✨ STOP DETECTED")
+                pyautogui.moveTo(current_x-50,current_y-150, duration=0.5)
                 pyautogui.click()
                 pyautogui.moveTo(current_x,current_y,duration=0.5)
                 no_change_count = 0
@@ -135,7 +138,7 @@ def check_youtube_shorts(step) -> bool:
             no_change_count = 0
         last_red_count = current_red_count
 
-        print('Y',start_y, 'RED',current_red_count, 'MAX', max_red_count)
+        print('YOUTUBE SHORTS PROGRESS Y:',start_y, ', PREV-RED:', max_red_count, ', CURRENT-RED:',current_red_count)
 
         if current_red_count > max_red_count:
             max_red_count = current_red_count
@@ -144,9 +147,8 @@ def check_youtube_shorts(step) -> bool:
         elif current_red_count < (max_red_count - 30) and max_red_count > 50:
             consecutive_drop_count += 1
             if consecutive_drop_count >= 2:
-                print("✨ 루프 감지 완료! 다음 비디오로 이동합니다.")
+                print("✨ LOOP DETECTED")
                 return True
-                
-        time.sleep(interval)
-        
+
+        time.sleep(interval)        
     return False

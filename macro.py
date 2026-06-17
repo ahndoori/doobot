@@ -15,11 +15,17 @@ import cv2
 import numpy as np
 import platform
 import subprocess
+import keyboard
 from pydantic import BaseModel
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import ImageGrab
 from datetime import datetime
+
+is_running = False # 매크로 동작 플래그
+stop_requested = False # 단축키 종료 요청 플래그
+last_executed_scenario = None # 최근 시나리오
+threading_lock = threading.Lock() # 플래그 제어 락
 
 handler = logging.StreamHandler(sys.stdout)
 handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
@@ -175,11 +181,12 @@ def load_all_scenarios():
 
 
 def run_macro_step(step,params):
+    global stop_requested
     logger.info(f"➡️ run_macro_step {step} {params}")
     action = step.get("action")
     if action == "check_youtube_shorts":
         import rules
-        return rules.check_youtube_shorts(step)
+        return rules.check_youtube_shorts(step,stop_requested=lambda:stop_requested)
     elif action == "hover":
         if step.get("target"):
             position=vision_sync(step.get("target"), step.get("confidence", 0.6))
@@ -243,6 +250,7 @@ def run_macro_step(step,params):
         found = False
 
         while elapsed_time < limit:
+            if stop_requested: return False
             found = vision_sync(target_img, conf)
             if found:
                 dashboard(f"✨ 타겟 발견: [{target_img}] ({elapsed_time:.1f}sec)")
@@ -253,6 +261,7 @@ def run_macro_step(step,params):
             elapsed_time += interval
 
         if not found:
+            if stop_requested: return False
             debug_path = os.path.join(BASE_DIR, "debug_screenshot.png")
             try:
                 ImageGrab.grab().save(debug_path)
@@ -279,35 +288,79 @@ def run_macro_step(step,params):
     return True
 
 
+
+
+def handle_hotkey_trigger():
+    global is_running, stop_requested, last_executed_scenario
+    with threading_lock:
+        if is_running:
+            dashboard("⌨️ REQUEST STOP")
+            stop_requested = True
+        else:
+            if last_executed_scenario:
+                macro_data = last_executed_scenario.get("macro")
+                param_data = last_executed_scenario.get("params")
+                
+                dashboard(f"⌨️ REQUEST RUN LAST SCENARIO: {macro_data.get('description','')}")
+                is_running = True
+                stop_requested = False
+                
+                threading.Thread(
+                    target=run_macro_sequence, 
+                    args=(macro_data, param_data), 
+                    daemon=True
+                ).start()
+            else:
+                dashboard("⌨️ REQUEST RUN, NO LAST SCENARIO")
+
+keyboard.add_hotkey('ctrl+shift+q', handle_hotkey_trigger)
+logger.info("⌨️ 단축키 매핑 완료: [Ctrl+Shift+Q] -> 스레드 제어 활성화")
+
 def run_macro_sequence(macro, params=None):
+    global is_running, stop_requested
     if params is None: params = {}
     dashboard(f"🔥 매크로 시퀀스 ➡️ [{macro.get('description', '')}]")
-    for idx, step in enumerate(macro.get("steps", [])):
-        action = step.get("action")
-        if action == "check_branch":
-            target_img = step.get("target")
-            conf = step.get("confidence", 0.7)
-            result = vision_sync(target_img, conf)
-            if not result and step.get("target2"): result = vision_sync(step.get("target2"), conf)
-            branch_steps = []
-            if result:
-                dashboard(f"🔍 check_branch success {target_img}")
-                branch_steps = step.get("true",[])
-            else:
-                dashboard(f"🔍 check_branch failure {target_img}")
-                branch_steps = step.get("false",[])
-            for b_step in branch_steps:
-                success = run_macro_step(b_step, params)
-                if not success: return
-                time.sleep(b_step.get("delay", 1.0))
-            continue
-        success = run_macro_step(step, params)
-        if not success: break
-        time.sleep(step.get("delay", 1.0))
-    if macro.get('loop'):
-        run_macro_sequence(macro, params)
-    else:
-        dashboard("✅ 시나리오 종료")
+    logger.info(macro)
+    
+    try:
+        for idx, step in enumerate(macro.get("steps", [])):
+
+            if stop_requested:
+                dashboard("🛑 사용자 중단")
+                break
+
+            action = step.get("action")
+            if action == "check_branch":
+                target_img = step.get("target")
+                conf = step.get("confidence", 0.7)
+                result = vision_sync(target_img, conf)
+                if not result and step.get("target2"): result = vision_sync(step.get("target2"), conf)
+                branch_steps = []
+                if result:
+                    dashboard(f"🔍 check_branch success {target_img}")
+                    branch_steps = step.get("true",[])
+                else:
+                    dashboard(f"🔍 check_branch failure {target_img}")
+                    branch_steps = step.get("false",[])
+                for b_step in branch_steps:
+                    if stop_requested: break # STOP_REQUESTED
+                    success = run_macro_step(b_step, params)
+                    if not success: return
+                    time.sleep(b_step.get("delay", 1.0))
+                continue
+            #if stop_requested: return # STOP_REQUESTED
+            success = run_macro_step(step, params)
+            #if not success: break
+            if not success: return
+            time.sleep(step.get("delay", 1.0))
+        if macro.get('loop') and not stop_requested:
+            run_macro_sequence(macro, params)
+    finally:
+        if not macro.get('loop') or stop_requested:
+            with threading_lock:
+                is_running = False
+                stop_requested = False
+            dashboard("✅ 시나리오 종료")
 
 
 macro = FastAPI(title="Macro Core")
@@ -369,9 +422,19 @@ def macro_api_command(request: CommandRequest):
                 "op": parsed_intent.get("op"),
                 "num2": parsed_intent.get("num2")
             }
+
+            global last_executed_scenario, is_running, stop_requested
+            with threading_lock:
+                if is_running:
+                    dashboard("⚠️ 이미 다른 매크로가 실행 중입니다.")
+                    return {"status": "fail", "message": "이미 실행 중"}
+                is_running = True
+                stop_requested = False
+                last_executed_scenario = {"macro": matched_macro, "params": params}
+
             threading.Thread(target=run_macro_sequence, args=(matched_macro, params), daemon=True).start()
             
-            dashboard(f"🤖 AI 분석 결과: {scenario_id}, PARAMETERS: {params}", True)
+            dashboard(f"🤖 AI분석: {scenario_id}, PARAMETERS: {params}", True)
             return {"status": "success", "message": f"매크로 실행"}
         else:
             dashboard(f"AI Mapping Fail -> 등록되지 않은 시나리오 ID (결과: {scenario_id})")

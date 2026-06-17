@@ -25,6 +25,7 @@ pip install pygame
 pip install asyncio
 pip install opencv-python
 pip install pillow
+pip install keyboard
 
 
 

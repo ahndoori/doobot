@@ -15,10 +15,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-logger = logging.getLogger("WebCore")
-app = FastAPI(title="Automation Console")
-
+#loggingIcon={DEBUG:"🌚",INFO:"☀️",WARNING:"☁️",ERROR:"⛈️}
+logging.basicConfig(level=logging.INFO,format="%(asctime)s [%(levelname)s] %(message)s")
+logger=logging.getLogger("WebCore")
+app=FastAPI(title="Automation Console")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

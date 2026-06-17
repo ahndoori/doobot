@@ -15,18 +15,21 @@ function log(msg) {
     scrollDown(logBox);
 }
 
-/**
- * 1. 시스템 로그 및 인프라 상태 웹소켓 연결
- */
 function connectLogWebSocket() {
     const logBox = document.getElementById("log-box");
     const btnMacro = document.getElementById("btn-macro");
     const btnVoice = document.getElementById("btn-voice");
 
-    logSocket = new WebSocket(`ws://${SERVER_HOST}/ws/dashboard`);
+	if (typeof logSocket !== "undefined" && logSocket && 
+       (logSocket.readyState === WebSocket.CONNECTING || logSocket.readyState === WebSocket.OPEN)) {
+        log("ℹ️ DASHBOARD SOCKET IS ALREADY CONNECTED");
+        return;
+    }
+    if (typeof logSocket !== "undefined" && logSocket) logSocket.close();
 
+    logSocket = new WebSocket(`ws://${SERVER_HOST}/ws/dashboard`);
     logSocket.onopen = () => {
-        log("🚀 [Doobot] 로그 웹소켓 연결 성공");
+        log("🚀 DASHBOARD SOCKET OPENED");
     };
 
     logSocket.onmessage = (event) => {
@@ -48,59 +51,51 @@ function connectLogWebSocket() {
     };
 
     logSocket.onclose = () => {
-        log("⚠️ 로그 웹소켓 끊김 - 2초 뒤 재연결 시도");
-        setTimeout(connectLogWebSocket, 2000);
+        log("⚠️ DASHBOARD SOCKET CLOSED");
+        setTimeout(connectLogWebSocket,3000);
     };
-
     logSocket.onerror = (err) => {
-		log(`👤 웹소켓 에러 ➡️ ${err}`);
+		log(`👤 DASHBOARD SOCKET ERROR: ${err}`);
         logSocket.close();
     };
 }
 
-function connectMouseWebSocket() {
-    if (mouseSocket && (mouseSocket.readyState === WebSocket.OPEN || mouseSocket.readyState === WebSocket.CONNECTING)) {
+function connectMouseWebSocket(){
+	if(typeof mouseSocket !== "undefined" && mouseSocket && 
+       (mouseSocket.readyState === WebSocket.CONNECTING || mouseSocket.readyState === WebSocket.OPEN)) {
+        log("ℹ️ MOUSE SOCKET IS ALREADY CONNECTED");
         return;
     }
+    if (typeof mouseSocket !== "undefined" && mouseSocket) mouseSocket.close();
 
     //const statusEl = document.getElementById("connection-status");
 	const btnTracker=document.getElementById("btn-tracker");
     mouseSocket = new WebSocket(`ws://${SERVER_HOST}/ws/mouse`);
 
     mouseSocket.onopen = () => {
+		log("🚀 MOUSE SOCKET OPENED");
 		updateButtonStatus(btnTracker,true);
-/*
-        if (statusEl) {
-            statusEl.textContent = "연결됨";
-            statusEl.style.color = "#00ff75";
-        }*/
     };
 
     mouseSocket.onmessage = (event) => {
         const data = jsonParseSafe(event.data);
         if (!data) return;
-
         const winTitle = document.getElementById("window-title");
         const relCoords = document.getElementById("relative-coords");
         const absCoords = document.getElementById("absolute-coords");
-
         if (winTitle) winTitle.textContent = data.window_title;
         if (relCoords) relCoords.textContent = data.coords;
         if (absCoords) absCoords.textContent = data.abs_coords;
     };
 
     mouseSocket.onclose = () => {
-		/*
-        if (statusEl) {
-            statusEl.textContent = "연결 끊김 (재연결 중...)";
-            statusEl.style.color = "red";
-        }*/
 		updateButtonStatus(btnTracker,false);
-        setTimeout(connectMouseWebSocket, 2000);
+		log("⚠️ MOUSE SOCKET CLOSED");
+        //setTimeout(connectMouseWebSocket, 2000);
     };
 
     mouseSocket.onerror = (err) => {
-        log(`마우스 웹소켓 에러: ${err}`);
+        log(`👤 MOUSE SOCKET ERROR: ${err}`);
         mouseSocket.close();
     };
 }
@@ -166,6 +161,7 @@ window.addEventListener("DOMContentLoaded", () => {
     const btnSend = document.getElementById("btn-send");
     const btnMacro = document.getElementById("btn-macro");
     const btnVoice = document.getElementById("btn-voice");
+	const btnTracker = document.getElementById("btn-tracker");
 
     if (cmdInput) {
         cmdInput.addEventListener("keydown", (e) => {
@@ -179,6 +175,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (btnSend) btnSend.addEventListener("click", sendNaturalCommand);
     if (btnMacro) btnMacro.addEventListener("click", () => toggleInfrastructure("macro"));
     if (btnVoice) btnVoice.addEventListener("click", () => toggleInfrastructure("voice"));
+	if (btnTracker) btnTracker.addEventListener("click", () => connectMouseWebSocket());
 
     connectLogWebSocket();
     connectMouseWebSocket();
