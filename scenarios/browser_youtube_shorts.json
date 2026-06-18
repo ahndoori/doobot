@@ -12,7 +12,7 @@
 			"move": true,
 			"true": [
 				{ "action": "click", "target": "youtube_shorts_next.png", "confidence": 0.7, "delay": 0.5 , "x":0, "y":50 },
-				{ "action": "hover", "delay": 1, "target": "youtube_shorts_comment.png", "confidence": 0.7, "x":-45, "y":255 },
+				{ "action": "hover", "delay": 1, "target": "youtube_shorts_comment.png", "confidence": 0.7, "x":-45, "y":257 },
 				{ "action":"check_youtube_shorts", "delay":0.8, "limit":120 }
 			]
 		},

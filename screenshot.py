@@ -6,17 +6,15 @@ from PIL import Image, ImageGrab
 
 PATH_VISION = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vision")
 
-def screen_image():
+def screen_image(resample=Image.Resampling.LANCZOS):
     img = ImageGrab.grab()
     if platform.system() == "Darwin":
         width, height = img.size
-        img = img.resize(
-            (width // 2, height // 2), resample=Image.Resampling.LANCZOS
-        )
+        img = img.resize( (width // 2, height // 2), resample=resample )
     return img
 
-def screen_array():
-    return np.array(screen_image())
+def screen_array(resample=Image.Resampling.LANCZOS):
+    return np.array(screen_image(resample))
 
 def screen_gray():
     return cv2.cvtColor(screen_array(), cv2.COLOR_RGB2GRAY)

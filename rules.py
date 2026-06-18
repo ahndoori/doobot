@@ -7,6 +7,7 @@ import cv2
 import numpy as np
 import pyautogui
 import screenshot
+from PIL import Image, ImageGrab
 
 logger = logging.getLogger("Macro-Core.Rules")
 
@@ -71,10 +72,12 @@ def pre_analyze_intent(user_command: str) -> dict:
 
 def check_youtube_shorts(step,stop_requested=None) -> bool:
     current_x, current_y = pyautogui.position()
-    start_y = current_y - 6
-    end_y = current_y + 6
-    start_x = current_x - 500
-    #start_x = 0
+    pyautogui.screenshot().save(os.path.join(os.path.dirname(os.path.abspath(__file__)),"debug.png"))
+    print(current_x, current_y)
+    
+    start_y = current_y - 5
+    end_y = current_y + 5
+    start_x = current_x - 450
     end_x = current_x
     
     max_red_count = 0
@@ -87,31 +90,39 @@ def check_youtube_shorts(step,stop_requested=None) -> bool:
     last_red_count = -1
     no_change_count = 0
     
+    # 디버깅: 스캔 시작 전 한 번만 이미지를 캡처하여 저장
+    context_np = screenshot.screen_array()
+    if 0 <= start_y < context_np.shape[0] and 0 <= end_y < context_np.shape[0] and \
+    0 <= start_x < context_np.shape[1] and 0 <= end_x < context_np.shape[1]:
+        crop_np = context_np[start_y:end_y, start_x:end_x]
+        if crop_np.size > 0:
+            Image.fromarray(crop_np).save(os.path.join(os.path.dirname(os.path.abspath(__file__)), "debug2.png"))
+        else:
+            print("⚠️ 디버깅 크롭 이미지 크기가 0입니다.")
+    else:
+         print(f"⚠️ 디버깅 크롭 좌표가 이미지 범위를 벗어났습니다: Y({start_y}:{end_y}), X({start_x}:{end_x}), Shape({context_np.shape})")
+
     while time.time() - start_time < timeout:
         if stop_requested and stop_requested(): return False
-        screen_np = screenshot.screen_array()
-        
-        # 화면 경계 체크 안전장치
+        screen_np = screenshot.screen_array(resample=Image.Resampling.NEAREST)
+
         if end_y >= screen_np.shape[0] or start_x < 0:
             return False
-            
         current_red_count = 0
-        
-        # 2. X축을 돌면서 지정된 Y축 범위(두께) 전체를 스캔합니다.
         for x in range(start_x, end_x):
             if x >= screen_np.shape[1]:
                 continue
-                
-            # 해당 X 좌표에서 위아래 두께 공간에 빨간색 선이 걸쳐져 있는지 확인
             is_red_pixel_found = False
             for y in range(start_y, end_y):
                 pixel = screen_np[y, x][:3]
-                c1, g, c2 = pixel[0], pixel[1], pixel[2]
-                
-                # RGB/BGR 채널 오차 방어: 첫 번째나 세 번째 채널 중 하나가 강한 원색 빨강인 경우
-                if (c1 > 180 or c2 > 180) and g < 50:
+                r, g, b = pixel[0], pixel[1], pixel[2]
+                if r > 120 and (int(r) - int(g) > 40) and (int(r) - int(b) > 30):
                     is_red_pixel_found = True
-                    break # 이 열(X)에는 빨간색이 존재하므로 브레이크
+                    break
+                #c1, g, c2 = pixel[0], pixel[1], pixel[2]
+                #if (c1 > 180 or c2 > 180) and g < 50:
+                #    is_red_pixel_found = True
+                #    break # 이 열(X)에는 빨간색이 존재하므로 브레이크
             
             if is_red_pixel_found:
                 current_red_count += 1
