@@ -7,6 +7,10 @@ import sys
 import asyncio
 import pyautogui
 import pygetwindow as gw
+import ollama
+import re
+import json
+import contextlib
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -15,22 +19,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
 
-#loggingIcon={DEBUG:"🌚",INFO:"☀️",WARNING:"☁️",ERROR:"⛈️}
+import macro
+import hotkey
+
 logging.basicConfig(level=logging.INFO,format="%(asctime)s [%(levelname)s] %(message)s")
 logger=logging.getLogger("WebCore")
-app=FastAPI(title="Automation Console")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+#app=FastAPI(title="Automation Console")
+
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 os.makedirs(os.path.join(BASE_DIR, "public"), exist_ok=True)
 os.makedirs(os.path.join(BASE_DIR, "templates"), exist_ok=True)
-app.mount("/public", StaticFiles(directory=os.path.join(BASE_DIR, "public")), name="public")
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 IS_WINDOWS = sys.platform.startswith("win")
 VENV_PYTHON = os.path.join(BASE_DIR, ".venv", "Scripts", "python.exe") if IS_WINDOWS else os.path.join(BASE_DIR, ".venv", "bin", "python")
@@ -43,6 +42,22 @@ infra_context = {
 
 dashboard_history = []
 active_connections: List[WebSocket] = []
+
+@contextlib.asynccontextmanager
+async def lifespan(app: FastAPI):
+    hotkey_thread = threading.Thread(target=start_hotkey_listener, daemon=True)
+    hotkey_thread.start()
+    yield
+
+app = FastAPI(title="Automation Console",lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+app.mount("/public", StaticFiles(directory=os.path.join(BASE_DIR, "public")), name="public")
 
 async def add_web_log_and_broadcast(message):
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -224,3 +239,143 @@ def cleanup_zombie_processes():
         if proc.poll() is None:
             logger.info("☀️ cleanup_zombie_processes: terminating voice_process")
             proc.terminate()
+
+
+
+
+
+
+
+
+
+
+
+
+is_running_macro = False
+is_processing_hotkey = False
+app_threading_lock = threading.Lock()
+
+
+def start_hotkey_listener():
+    try:
+        # 단축키 등록
+        hotkey.register_hotkey_c_s_q(combination="ctrl+shift+q", callback=handler_hotkey_c_s_q)
+        logger.info("🔑 단축키(ctrl+shift+q) 등록 완료")
+        
+        # 💡 [중요] 단축키 라이브러리가 이벤트를 대기하도록 만드는 루프가 필요합니다.
+        # 만약 hotkey 라이브러리 자체에 listen()이나 wait() 같은 메서드가 있다면 여기서 호출해야 합니다.
+        # 예: keyboard 라이브러리라면 keyboard.wait() 등을 사용함.
+        # 만약 내부적으로 무한루프를 돌려야 한다면 아래처럼 처리할 수도 있습니다.
+        # while True: time.sleep(1)
+        
+    except Exception as e:
+        logger.error(f"단축키 리스너 실행 중 오류 발생: {e}")
+
+
+def handler_hotkey_c_s_q():
+    global is_running_macro, is_processing_hotkey
+    print('handler_hotkey_c_s_q')
+    with app_threading_lock:
+        if is_processing_hotkey:
+            return
+        is_processing_hotkey = True
+        
+    try:
+        if is_running_macro:
+            is_running_macro = False
+            logger.info("🚨 [App 승인] 구동 중인 매크로 확인. 엔진 강제 종료 프로세스 가동.")
+            macro.kill()
+            macro.dashboard("🛑 사용자에 의해 매크로 강제 종료 요청됨")
+            
+        else:
+            if hasattr(macro, 'last_executed_scenario') and macro.last_executed_scenario:
+                macro_data = macro.last_executed_scenario.get("macro")
+                param_data = macro.last_executed_scenario.get("params")
+                
+                macro.dashboard(f"⌨️ REQUEST RUN LAST SCENARIO: {macro_data.get('description','')}")
+                is_running_macro = True
+                
+                threading.Thread(
+                    target=macro.run_macro_sequence, 
+                    args=(macro_data, param_data), 
+                    daemon=True
+                ).start()
+            else:
+                macro.dashboard("⌨️ REQUEST RUN, NO LAST SCENARIO")
+    finally:
+        with app_threading_lock:
+            is_processing_hotkey = False
+
+
+
+def callback_macro():
+    global is_running_macro
+    with app_threading_lock:
+        is_running_macro = False
+    macro.dashboard("✅ 시나리오 종료 (App 변수 해제 완료)")
+
+class CommandRequest(BaseModel):
+    command: str
+
+@app.post("/api/command")
+def api_command(request: CommandRequest):
+    global is_running_macro
+    user_command = request.command
+    macro.dashboard(f"📩 macro /api/command '{user_command}'")
+
+    try:
+        import rules
+        rule_hint = rules.pre_analyze_intent(user_command)
+    except Exception as e:
+        logger.error(f"⛈️ pre_analyze_intent Exception {str(e)}")
+        return {"status": "error", "message": str(e)}
+
+    all_scenarios = macro.load_all_scenarios()
+    scenarios_desc = "".join([f"- '{s_id}': {s_data.get('description', '')}\n" for s_id, s_data in all_scenarios.items()])
+    
+    prompt = rules.PROMPT_TEMPLATE.format(
+        scenarios_desc=scenarios_desc,
+        has_math=rule_hint['has_math'],
+        suggested_target=rule_hint['suggested_target']
+    )
+
+    try:
+        response_data = ollama.chat(
+            model=macro.MODEL_NAME,
+            messages=[{"role": "system", "content": prompt}, {"role": "user", "content": user_command}],
+            options={"temperature": 0.0, "num_predict": 100},
+            format="json"
+        )
+        response = response_data['message']['content'].strip()
+        json_match = re.search(r"\{.*\}", response, re.DOTALL)
+        if not json_match: raise ValueError("OLLAMA JSON 응답 파싱 에러")
+        
+        parsed_intent = json.loads(json_match.group(0))
+        scenario_id = parsed_intent.get("scenario_id", "unknown")
+
+        if scenario_id != "unknown" and scenario_id in all_scenarios:
+            matched_macro = all_scenarios[scenario_id]
+            params = {
+                "num1": parsed_intent.get("num1"),
+                "op": parsed_intent.get("op"),
+                "num2": parsed_intent.get("num2")
+            }
+
+            with app_threading_lock:
+                if is_running_macro:
+                    macro.dashboard("⚠️ 이미 다른 매크로가 실행 중입니다.")
+                    return {"status": "fail", "message": "이미 실행 중"}
+                is_running_macro = True
+                macro.last_executed_scenario = {"macro": matched_macro, "params": params}
+
+            macro.start(matched_macro, params, callback_on_finish=callback_macro)
+            macro.dashboard(f"🤖 AI분석: {scenario_id}, PARAMETERS: {params}")
+            return {"status": "success", "message": f"매크로 실행"}
+            
+        else:
+            macro.dashboard(f"AI Mapping Fail -> 등록되지 않은 시나리오 ID (결과: {scenario_id})")
+            return {"status": "fail", "message": "일치하는 매크로 시나리오가 없습니다."}
+            
+    except Exception as e:
+        logger.error(f"⛈️ [Ollama 연산/파싱 중 크래시]: {str(e)}")
+        return {"status": "error", "message": str(e)}

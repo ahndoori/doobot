@@ -1,6 +1,7 @@
 // [설정] 서버 주소 정의
 const SERVER_HOST = window.location.host;
-const MACRO_CORE_URL = "http://127.0.0.1:4445/api/command";
+//const MACRO_CORE_URL = "http://127.0.0.1:4445/api/command";
+const MACRO_CORE_URL = "http://127.0.0.1:4444/api/command";
 
 // 웹소켓 인스턴스를 보관할 전역 변수 (재연결을 위해 let 사용)
 let logSocket = null;
