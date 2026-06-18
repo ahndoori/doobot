@@ -30,6 +30,7 @@ pip install asyncio
 pip install opencv-python
 pip install pillow
 pip install pynput
+pip install pywinctl
 
 
 pip install PyQt6 SpeechRecognition

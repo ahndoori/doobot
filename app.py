@@ -6,7 +6,7 @@ import threading
 import sys
 import asyncio
 import pyautogui
-import pygetwindow as gw
+import pywinctl as pwc
 import ollama
 import re
 import json
@@ -198,28 +198,38 @@ async def websocket_endpoint(websocket: WebSocket):
 async def websocket_mouse_tracker(websocket: WebSocket):
     await websocket.accept()
     logger.info("☀️ /ws/mouse")
+    
     last_x, last_y = -1, -1
-    active_win = None
     win_title = "알 수 없는 창"
     win_left, win_top = 0, 0
     last_win_check_time = 0 
+    
     try:
         while True:
             current_time = time.time()
+            
+            # 0.5초마다 활성화된 창 체크
             if current_time - last_win_check_time > 0.5:
-                active_win = gw.getActiveWindow()
-                if active_win is not None and active_win.title:
-                    win_title = active_win.title
+                # pywinctl은 맥에서도 현재 활성화된 창을 잘 가져옵니다.
+                active_win = pwc.getActiveWindow()
+                if active_win is not None:
+                    # pywinctl은 title 속성 대신 title 변수나 메서드를 지원
+                    win_title = active_win.title if hasattr(active_win, 'title') else "알 수 없는 창"
+                    # 크로스플랫폼 매칭을 위해 위치 정보 가져오기
                     win_left = active_win.left
                     win_top = active_win.top
                 last_win_check_time = current_time
+            
             abs_x, abs_y = pyautogui.position()
+            
             if abs_x == last_x and abs_y == last_y:
                 await asyncio.sleep(0.03)
                 continue
+                
             last_x, last_y = abs_x, abs_y
             rel_x = abs_x - win_left
             rel_y = abs_y - win_top
+            
             data = {
                 "window_title": win_title,
                 "coords": f"{rel_x}x{rel_y}",
@@ -227,6 +237,7 @@ async def websocket_mouse_tracker(websocket: WebSocket):
             }
             await websocket.send_json(data)
             await asyncio.sleep(0.03)
+            
     except WebSocketDisconnect:
         logger.info("except WebSocketDisconnect")
     except Exception as e:
@@ -255,19 +266,10 @@ is_running_macro = False
 is_processing_hotkey = False
 app_threading_lock = threading.Lock()
 
-
 def start_hotkey_listener():
     try:
-        # 단축키 등록
         hotkey.register_hotkey_c_s_q(combination="ctrl+shift+q", callback=handler_hotkey_c_s_q)
         logger.info("🔑 단축키(ctrl+shift+q) 등록 완료")
-        
-        # 💡 [중요] 단축키 라이브러리가 이벤트를 대기하도록 만드는 루프가 필요합니다.
-        # 만약 hotkey 라이브러리 자체에 listen()이나 wait() 같은 메서드가 있다면 여기서 호출해야 합니다.
-        # 예: keyboard 라이브러리라면 keyboard.wait() 등을 사용함.
-        # 만약 내부적으로 무한루프를 돌려야 한다면 아래처럼 처리할 수도 있습니다.
-        # while True: time.sleep(1)
-        
     except Exception as e:
         logger.error(f"단축키 리스너 실행 중 오류 발생: {e}")
 
@@ -308,11 +310,12 @@ def handler_hotkey_c_s_q():
 
 
 
-def callback_macro():
+
+def callback_finish_macro():
     global is_running_macro
     with app_threading_lock:
         is_running_macro = False
-    macro.dashboard("✅ 시나리오 종료 (App 변수 해제 완료)")
+    macro.dashboard("✅ END MACRO THREAD")
 
 class CommandRequest(BaseModel):
     command: str
@@ -368,7 +371,7 @@ def api_command(request: CommandRequest):
                 is_running_macro = True
                 macro.last_executed_scenario = {"macro": matched_macro, "params": params}
 
-            macro.start(matched_macro, params, callback_on_finish=callback_macro)
+            macro.start(matched_macro, params, callback_on_finish=callback_finish_macro)
             macro.dashboard(f"🤖 AI분석: {scenario_id}, PARAMETERS: {params}")
             return {"status": "success", "message": f"매크로 실행"}
             
