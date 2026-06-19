@@ -4,6 +4,7 @@ const MACRO_CORE_URL = "http://127.0.0.1:4444/api/command";
 
 let logSocket = null;
 let mouseSocket = null;
+let keySocket = null;
 
 function log(msg) {
 	const logBox = document.getElementById("log-box");
@@ -68,12 +69,12 @@ function connectMouseWebSocket(){
     if (typeof mouseSocket !== "undefined" && mouseSocket) mouseSocket.close();
 
     //const statusEl = document.getElementById("connection-status");
-	const btnTracker=document.getElementById("btn-tracker");
+	const btnMouse=document.getElementById("btn-mouse");
     mouseSocket = new WebSocket(`ws://${SERVER_HOST}/ws/mouse`);
 
     mouseSocket.onopen = () => {
 		log("🚀 MOUSE SOCKET OPENED");
-		updateButtonStatus(btnTracker,true);
+		updateButtonStatus(btnMouse,true);
     };
 
     mouseSocket.onmessage = (event) => {
@@ -88,7 +89,7 @@ function connectMouseWebSocket(){
     };
 
     mouseSocket.onclose = () => {
-		updateButtonStatus(btnTracker,false);
+		updateButtonStatus(btnMouse,false);
 		log("⚠️ MOUSE SOCKET CLOSED");
         //setTimeout(connectMouseWebSocket,2000);
     };
@@ -98,6 +99,38 @@ function connectMouseWebSocket(){
         mouseSocket.close();
     };
 }
+
+function connectKeyWebSocket(){
+	if(typeof keySocket !== "undefined" && keySocket && 
+       (keySocket.readyState === WebSocket.CONNECTING || keySocket.readyState === WebSocket.OPEN)) {
+        log("ℹ️ KEY SOCKET IS ALREADY CONNECTED");
+        return;
+    }
+    if (typeof keySocket !== "undefined" && keySocket) keySocket.close();
+	const btnKey=document.getElementById("btn-key");
+    keySocket = new WebSocket(`ws://${SERVER_HOST}/ws/key`);
+    keySocket.onopen = () => {
+		log("🚀 KEY SOCKET OPENED");
+		updateButtonStatus(btnKey,true);
+    };
+    keySocket.onmessage = (event) => {
+        const data = jsonParseSafe(event.data);
+        if(!data) return;
+        const keyData = document.getElementById("key-data");
+        if (keyData) keyData.textContent = data.source.substr(0,1)+data.value;
+    };
+    keySocket.onclose = () => {
+		updateButtonStatus(btnKey,false);
+		log("⚠️ KEY SOCKET CLOSED");
+    };
+    keySocket.onerror = (err) => {
+        log(`👤 KEY SOCKET ERROR: ${err}`);
+        keySocket.close();
+    };
+}
+
+
+
 
 async function sendNaturalCommand() {
     const cmdInput = document.getElementById("cmd-input");
@@ -153,9 +186,10 @@ window.addEventListener("DOMContentLoaded", () => {
     const btnSend = document.getElementById("btn-send");
     //const btnMacro = document.getElementById("btn-macro");
     const btnVoice = document.getElementById("btn-voice");
-	const btnTracker = document.getElementById("btn-tracker");
+	const btnMouse = document.getElementById("btn-mouse");
+	const btnKey = document.getElementById("btn-key");
 
-    if (cmdInput) {
+    if(cmdInput){
         cmdInput.addEventListener("keydown", (e) => {
             if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -164,10 +198,12 @@ window.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    if (btnSend) btnSend.addEventListener("click", sendNaturalCommand);
+    if(btnSend) btnSend.addEventListener("click", sendNaturalCommand);
 	if(btnVoice) btnVoice.addEventListener("click", /*async*/ () => /*await*/ fetch(`/api/daemon/voice`,{method:'POST'}) );
-	if (btnTracker) btnTracker.addEventListener("click", () => connectMouseWebSocket());
+	if(btnMouse) btnMouse.addEventListener("click", () => connectMouseWebSocket());
+	if(btnKey) btnKey.addEventListener("click", () => connectKeyWebSocket());
 	//if (btnMacro) btnMacro.addEventListener("click", () => toggleInfrastructure("macro"));
     connectLogWebSocket();
     connectMouseWebSocket();
+	connectKeyWebSocket();
 });

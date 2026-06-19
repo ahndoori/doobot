@@ -1,20 +1,21 @@
+## START SCRIPT
+.venv\Scripts\python start
+.venv/bin/python start
+
+.venv\Scripts\activate
+source ./.venv/bin/activate
 
 
+## OLLAMA QWEN 2.5
 https://ollama.com/download/OllamaSetup.exe
 cd C:\Users\kaudo\AppData\Local\Programs\Ollama
 ollama pull qwen2.5:1.5b
 
-
+## PYTHON LIBRARY
 python -m pip install --upgrade pip
-
 
 python -m pip install virtualenv
 python -m virtualenv .venv
-
-.venv\Scripts\activate
-
-source ./.venv/bin/activate
-
 
 pip install fastapi uvicorn
 pip install jinja2 requests
@@ -42,11 +43,8 @@ taskkill /f /im python.exe
 .venv\Scripts\activate
 uvicorn app:app --port 4444 --reload
 
-.venv\Scripts\python start
 
-.venv/bin/python start
-
-
+## TEST URL
 curl -X POST "http://127.0.0.1:4444/api/command" -H "Content-Type: application/json" -d "{\"command\": \"300x300에 마우스클릭\"}"
 
 curl -X POST "http://127.0.0.1:4444/api/command" -H "Content-Type: application/json" -d "{\"command\": \"오버워치 실행해줘\"}"

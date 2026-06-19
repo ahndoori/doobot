@@ -11,6 +11,7 @@ import ollama
 import re
 import json
 import contextlib
+import pynput
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -209,6 +210,81 @@ async def fastapi_ws_mouse(websocket: WebSocket):
         logger.error(f"⛈️ websocket_mouse_tracker Exception {e}")
 
 
+
+@app.websocket("/ws/key")
+async def fastapi_ws_key(websocket: WebSocket):
+    """
+    키보드 입력과 마우스 클릭(좌/우클릭) 이벤트를 하나의 웹소켓으로 통합 전송합니다.
+    (마우스 커서 움직임은 추적하지 않아 부하가 매우 적습니다.)
+    """
+    await websocket.accept()
+    logger.info("☀️ /ws/key (키보드 + 마우스 클릭) 연결 성공")
+    
+    # 두 리스너의 이벤트를 한 곳으로 모을 통합 비동기 큐
+    loop = asyncio.get_running_loop()
+    event_queue = asyncio.Queue()
+
+    # 1. 키보드 입력 콜백
+    def on_press(key):
+        try:
+            key_data = key.char if hasattr(key, 'char') and key.char is not None else str(key)
+        except Exception:
+            key_data = str(key)
+            
+        data = {"source":"","action": "pressed", "value": key_data}
+        loop.call_soon_threadsafe(event_queue.put_nowait, data)
+    def on_click(x, y, button, pressed):
+        button_name = button.name if hasattr(button, 'name') else str(button)
+        data = {
+            "source": "m",
+            "action": "pressed" if pressed else "released",
+            "value": button_name,
+            "abs_coords": f"{x}x{y}"
+        }
+        loop.call_soon_threadsafe(event_queue.put_nowait, data)
+    key_listener = pynput.keyboard.Listener(on_press=on_press)
+    mouse_listener = pynput.mouse.Listener(on_click=on_click)
+    key_listener.start()
+    mouse_listener.start()
+    try:
+        #win_title = "UNKNOWN"
+        #win_left, win_top = 0, 0
+        while True:
+            event_data = await event_queue.get()
+
+            '''
+            active_win = pwc.getActiveWindow()
+            if active_win is not None:
+                win_title = active_win.title if hasattr(active_win, 'title') else "UNKNOWN"
+                win_left = active_win.left
+                win_top = active_win.top
+            '''
+
+            # 공통 데이터 포맷 가공
+            payload = {
+                "type": "input_event",
+                "source": event_data["source"],
+                "action": event_data["action"],
+                "value": event_data["value"],
+                #"window_title": win_title
+            }
+            '''
+            if event_data["source"] == "m":
+                abs_x, abs_y = map(int, event_data["abs_coords"].split('x'))
+                rel_x = abs_x - win_left
+                rel_y = abs_y - win_top
+                payload["coords"] = f"{rel_x}x{rel_y}"
+                payload["abs_coords"] = event_data["abs_coords"]
+            '''
+            await websocket.send_json(payload)
+    except WebSocketDisconnect:
+        logger.info("❌ /ws/key 웹소켓 연결 종료")
+    except Exception as e:
+        logger.error(f"⛈️ websocket_combined_tracker 예외 발생: {e}")
+    finally:
+        # 6. 종료 시 두 리스너 스레드 모두 깔끔하게 클로징
+        key_listener.stop()
+        mouse_listener.stop()
 
 
 

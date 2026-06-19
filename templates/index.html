@@ -1,52 +1,54 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Macro Dashboard</title>
-    <link rel="stylesheet" href="/public/index.css?v=20260609_led_final">
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>AI Macro Dashboard</title>
+	<link rel="stylesheet" href="/public/index.css?v=20260609_led_final">
 </head>
 <body>
-    <div class="app-container">
-        <main class="content-area">
-            <div id="log-box" class="log-viewport"></div>
-        </main>
+	<div class="app-container">
+		<main class="content-area">
+			<div id="log-box" class="log-viewport"></div>
+		</main>
 
-        <footer class="control-panel">
-            <div class="control-wrapper">
-                
-                <div class="status-bar">
+		<footer class="control-panel">
+			<div class="control-wrapper">
+				
+				<div class="status-bar">
 					<!--
 					<div class="btn" id="btn-macro">
-                        <span class="indicator blinking led-green"></span> 
+						<span class="indicator blinking led-green"></span> 
 						LLM/Macro
-                    </div>
+					</div>
 					-->
 					<div class="btn" id="btn-voice">
-                        <span class="indicator blinking led-green"></span> 
-						VoiceListener
-                    </div>
-					<div class="btn" id="btn-tracker">
-                        <span class="indicator blinking led-green"></span> 
-						<div id="window-title">---</div>
+						<span class="indicator blinking led-green"></span> Voice
+					</div>
+					<div class="btn" id="btn-key">
+						<span class="indicator blinking led-red"></span>
+						<div id="key-data">Key</div>
+					</div>
+					<div class="btn" id="btn-mouse">
+						<span class="indicator blinking led-green"></span> 
+						<div id="window-title">-</div>
 						<div id="relative-coords">0x0</div>
 						<div id="absolute-coords">0x0</div>
-                    </div>
-					
-                </div>
+					</div>
+				</div>
 
-                <div class="input-container">
-                    <textarea id="cmd-input" rows="1" placeholder="명령을 입력하세요 (Enter: 전송 / Shift+Enter: 줄바꿈)"></textarea>
-                    <button id="btn-send" class="send-btn">
-                        <svg viewBox="0 0 24 24" width="22" height="22">
-                            <path fill="currentColor" d="M2,21L23,12L2,3V10L17,12L2,14V21Z" />
-                        </svg>
-                    </button>
-                </div>
+				<div class="input-container">
+					<textarea id="cmd-input" rows="1" placeholder="명령을 입력하세요 (Enter: 전송 / Shift+Enter: 줄바꿈)"></textarea>
+					<button id="btn-send" class="send-btn">
+						<svg viewBox="0 0 24 24" width="22" height="22">
+							<path fill="currentColor" d="M2,21L23,12L2,3V10L17,12L2,14V21Z" />
+						</svg>
+					</button>
+				</div>
 
-            </div>
-        </footer>
-    </div>
-    <script src="/public/index.js?v=20260609_led_final"></script>
+			</div>
+		</footer>
+	</div>
+	<script src="/public/index.js?v=20260609_led_final"></script>
 </body>
 </html>
