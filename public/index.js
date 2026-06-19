@@ -1,9 +1,7 @@
-// [설정] 서버 주소 정의
 const SERVER_HOST = window.location.host;
 //const MACRO_CORE_URL = "http://127.0.0.1:4445/api/command";
 const MACRO_CORE_URL = "http://127.0.0.1:4444/api/command";
 
-// 웹소켓 인스턴스를 보관할 전역 변수 (재연결을 위해 let 사용)
 let logSocket = null;
 let mouseSocket = null;
 
@@ -18,7 +16,7 @@ function log(msg) {
 
 function connectLogWebSocket() {
     const logBox = document.getElementById("log-box");
-    const btnMacro = document.getElementById("btn-macro");
+    //const btnMacro = document.getElementById("btn-macro");
     const btnVoice = document.getElementById("btn-voice");
 
 	if (typeof logSocket !== "undefined" && logSocket && 
@@ -46,7 +44,7 @@ function connectLogWebSocket() {
             logBox.appendChild(logLine);
             scrollDown(logBox);
         } else if (data.type === "infra_status") {
-            updateButtonStatus(btnMacro, data.macro_alive);
+            //updateButtonStatus(btnMacro, data.macro_alive);
             updateButtonStatus(btnVoice, data.voice_alive);
         }
     };
@@ -92,7 +90,7 @@ function connectMouseWebSocket(){
     mouseSocket.onclose = () => {
 		updateButtonStatus(btnTracker,false);
 		log("⚠️ MOUSE SOCKET CLOSED");
-        //setTimeout(connectMouseWebSocket, 2000);
+        //setTimeout(connectMouseWebSocket,2000);
     };
 
     mouseSocket.onerror = (err) => {
@@ -101,18 +99,11 @@ function connectMouseWebSocket(){
     };
 }
 
-/**
- * 3. 매크로 코어 명령 전송 함수
- */
 async function sendNaturalCommand() {
     const cmdInput = document.getElementById("cmd-input");
     const commandText = cmdInput.value.trim();
-    
     if (!commandText) return;
     cmdInput.value = "";
-    
-    //log(`👤 [User Input] ➡️ ${commandText}`);
-    
     try {
         const response = await fetch(MACRO_CORE_URL, {
             method: "POST",
@@ -160,7 +151,7 @@ function scrollDown(element) {
 window.addEventListener("DOMContentLoaded", () => {
     const cmdInput = document.getElementById("cmd-input");
     const btnSend = document.getElementById("btn-send");
-    const btnMacro = document.getElementById("btn-macro");
+    //const btnMacro = document.getElementById("btn-macro");
     const btnVoice = document.getElementById("btn-voice");
 	const btnTracker = document.getElementById("btn-tracker");
 
@@ -174,10 +165,9 @@ window.addEventListener("DOMContentLoaded", () => {
     }
 
     if (btnSend) btnSend.addEventListener("click", sendNaturalCommand);
-    if (btnMacro) btnMacro.addEventListener("click", () => toggleInfrastructure("macro"));
-    if (btnVoice) btnVoice.addEventListener("click", () => toggleInfrastructure("voice"));
+	if(btnVoice) btnVoice.addEventListener("click", /*async*/ () => /*await*/ fetch(`/api/daemon/voice`,{method:'POST'}) );
 	if (btnTracker) btnTracker.addEventListener("click", () => connectMouseWebSocket());
-
+	//if (btnMacro) btnMacro.addEventListener("click", () => toggleInfrastructure("macro"));
     connectLogWebSocket();
     connectMouseWebSocket();
 });

@@ -206,15 +206,15 @@ def run_macro_step(step,params):
         if "{num1}" in text_to_type: text_to_type = text_to_type.replace("{num1}", params.get("num1", "0"))
         if "{num2}" in text_to_type: text_to_type = text_to_type.replace("{num2}", params.get("num2", "0"))
         pyautogui.write(text_to_type, interval=0.05)
-        dashboard(f"⌨️ 키보드 타이핑: '{text_to_type}'")
+        dashboard(f"⌨️ KEY TYPING: '{text_to_type}'")
     elif action == "press":
         key_to_press = step.get("key")
         pyautogui.press(key_to_press)
-        dashboard(f"⌨️ 단축키 입력: [{key_to_press}]")
+        dashboard(f"⌨️ KEY PRESS: [{key_to_press}]")
     elif action == "scroll":
         clicks = step.get("clicks", -100)
         pyautogui.scroll(clicks)
-        dashboard(f"🎯 SUCCESS SCROLL {clicks}")
+        dashboard(f"⌨️ SCROLL {clicks}")
     return True
 
 
